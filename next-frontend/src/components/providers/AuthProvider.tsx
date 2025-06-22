@@ -28,7 +28,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         // 动态导入认证函数，避免模块级别的错误
-        const { getCurrentUser, onAuthStateChange } = await import('@/lib/auth')
+        const { getCurrentUser, onAuthStateChange } = await import('../../lib/auth')
         
         // 获取当前用户
         const result = await getCurrentUser()

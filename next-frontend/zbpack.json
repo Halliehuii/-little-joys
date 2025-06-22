@@ -1,5 +1,11 @@
 {
-  "build_command": "npm install && npm run build",
+  "build_command": "npm ci && npm run build",
   "start_command": "npm start",
-  "node_version": "18"
+  "node_version": "18",
+  "build_env": {
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
+  "env": {
+    "NODE_ENV": "production"
+  }
 } 

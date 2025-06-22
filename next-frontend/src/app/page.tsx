@@ -225,7 +225,7 @@ export default function HomePage() {
 
     try {
       // 使用API工具发送请求，自动处理认证
-      const { apiRequest } = await import('@/lib/api')
+      const { apiRequest } = await import('../lib/api')
       
       const response = await apiRequest.post('/api/posts', {
         content: postData.content,
@@ -294,7 +294,7 @@ export default function HomePage() {
               <>
                 <button
                   onClick={async () => {
-                    const { debugAuthState } = await import('@/lib/auth')
+                    const { debugAuthState } = await import('../lib/auth')
                     const state = debugAuthState()
                     alert(`认证状态:\n- 有Token: ${state.hasToken}\n- Token有效: ${state.tokenValid}\n- 已认证: ${state.isAuthenticated}\n\n详细信息请查看控制台`)
                   }}

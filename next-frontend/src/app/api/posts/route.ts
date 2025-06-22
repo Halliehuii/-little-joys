@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+// 强制动态渲染，避免静态生成问题
+export const dynamic = 'force-dynamic';
+
 // 获取API基础URL - 与lib/api.ts保持一致的逻辑
 const getApiBaseUrl = () => {
   // 优先使用环境变量中的API URL

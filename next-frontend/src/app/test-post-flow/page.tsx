@@ -140,7 +140,7 @@ export default function TestPostFlowPage() {
       
       try {
         // 动态获取API基础URL
-        const { getApiBaseUrl } = await import('@/lib/api')
+        const { getApiBaseUrl } = await import('../../lib/api')
         const backendUrl = getApiBaseUrl()
         
         const backendResponse = await fetch(`${backendUrl}/health`)

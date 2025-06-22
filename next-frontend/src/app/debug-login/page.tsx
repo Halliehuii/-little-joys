@@ -30,9 +30,9 @@ export default function DebugLoginPage() {
         return;
       }
 
-      // 动态导入 Supabase
+      // 动态导入 Supabase - 修复路径
       addLog('📦 动态加载 Supabase...');
-      const { supabase } = await import('@/lib/supabase');
+      const { supabase } = await import('../../lib/supabase');
       addLog('✅ Supabase 模块加载成功');
       
       // 测试连接
@@ -94,9 +94,9 @@ export default function DebugLoginPage() {
         return;
       }
 
-      // 4. 动态导入认证函数
+      // 4. 动态导入认证函数 - 修复路径
       addLog('📦 加载认证模块...');
-      const { signIn } = await import('@/lib/auth');
+      const { signIn } = await import('../../lib/auth');
       addLog('✅ 认证模块加载成功');
       
       // 5. 尝试登录
