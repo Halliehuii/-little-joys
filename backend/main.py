@@ -105,7 +105,6 @@ if ENVIRONMENT == "production":
     # 生产环境：严格的CORS配置
     ALLOWED_ORIGINS = [
         "https://littlejoys.xyz",
-        "https://www.littlejoys.xyz",
         "https://api.littlejoys.xyz",
         # 可以根据需要添加其他域名
     ]
