@@ -36,7 +36,7 @@ export default function HomePage() {
   const fetchPosts = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/posts?page=1&limit=20&sort_type=latest')
+      const response = await fetch('/api/v1/posts?page=1&limit=20&sort_type=latest')
       const result = await response.json()
       
       // 修复数据格式处理 - 直接使用后端返回的格式
@@ -281,18 +281,22 @@ export default function HomePage() {
         )}
 
         {/* 便签列表 */}
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading ? (
-            // 加载状态
-            <div className="flex justify-center items-center py-20">
-              <div className="text-center">
-                <div className="animate-spin text-4xl mb-4">🌸</div>
-                <p className="text-gray-600">正在加载幸福小事...</p>
-              </div>
-            </div>
+            // 加载状态 - 显示3个占位符
+            <>
+              {[1, 2, 3].map((index) => (
+                <div key={index} className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl shadow-md animate-pulse flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin text-2xl mb-2">🌸</div>
+                    <p className="text-gray-500 text-sm">加载中...</p>
+                  </div>
+                </div>
+              ))}
+            </>
           ) : posts.length === 0 ? (
-            // 空状态
-            <div className="text-center py-20">
+            // 空状态 - 占据整个网格区域
+            <div className="col-span-1 md:col-span-2 lg:col-span-3 text-center py-20">
               <div className="text-6xl mb-4">📝</div>
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
                 还没有人分享小确幸
@@ -310,7 +314,7 @@ export default function HomePage() {
               )}
             </div>
           ) : (
-            // 便签列表
+            // 便签列表 - 网格布局
             posts.map((post) => (
               <PostCard
                 key={post.id}

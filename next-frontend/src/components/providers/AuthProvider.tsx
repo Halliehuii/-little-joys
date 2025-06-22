@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react'
 import { useAuthStore } from '@/lib/store/auth'
-import { onAuthStateChange, getCurrentUser } from '@/lib/auth'
 import { Toaster } from 'react-hot-toast'
 
 interface AuthProviderProps {
@@ -18,33 +17,70 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         setLoading(true)
         
+        // 检查环境变量
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        
+        if (!supabaseUrl || !supabaseKey) {
+          console.warn('⚠️ Supabase 环境变量未配置，跳过认证初始化')
+          setUser(null)
+          return
+        }
+        
+        // 动态导入认证函数，避免模块级别的错误
+        const { getCurrentUser, onAuthStateChange } = await import('@/lib/auth')
+        
         // 获取当前用户
         const result = await getCurrentUser()
         if (result.success && result.user) {
           setUser(result.user)
+          console.log('✅ 用户认证状态已恢复')
         } else {
           setUser(null)
+          console.log('ℹ️ 用户未登录')
         }
-      } catch (error) {
-        console.error('初始化认证状态失败:', error)
+        
+        // 监听认证状态变化
+        const { data: { subscription } } = onAuthStateChange((user) => {
+          console.log('🔄 认证状态变化:', user ? '已登录' : '未登录')
+          setUser(user)
+        })
+        
+        // 保存订阅以便清理
+        return () => {
+          subscription?.unsubscribe()
+        }
+        
+      } catch (error: any) {
+        console.warn('⚠️ 认证初始化失败，但应用将继续运行:', error?.message || error)
         setUser(null)
+        
+        // 如果是网络错误或 Supabase 不可用，不抛出错误
+        if (error?.message?.includes('fetch') || 
+            error?.message?.includes('network') ||
+            error?.message?.includes('supabase')) {
+          console.log('🔧 建议检查 Supabase 配置和网络连接')
+        }
       } finally {
         setLoading(false)
       }
     }
 
-    // 监听认证状态变化
-    const { data: { subscription } } = onAuthStateChange((user) => {
-      console.log('认证状态变化:', user ? '已登录' : '未登录')
-      setUser(user)
+    // 执行初始化
+    let cleanup: (() => void) | undefined
+    initAuth().then((cleanupFn) => {
+      cleanup = cleanupFn
+    }).catch((error) => {
+      console.warn('认证初始化异常:', error)
+      setLoading(false)
+      setUser(null)
     })
-
-    // 初始化
-    initAuth()
 
     // 清理函数
     return () => {
-      subscription?.unsubscribe()
+      if (cleanup) {
+        cleanup()
+      }
     }
   }, [setUser, setLoading])
 
