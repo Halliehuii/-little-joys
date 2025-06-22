@@ -1,13 +1,18 @@
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import datetime
 import logging
+import uuid
+import jwt
+from jwt.exceptions import InvalidTokenError
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import httpx
+from supabase import create_client, Client
 
 # 配置日志
 logging.basicConfig(
@@ -27,14 +32,34 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 AMAP_API_KEY = os.getenv("AMAP_API_KEY")
 OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")
 
+# JWT配置 - 使用正确的Supabase JWT密钥
+JWT_SECRET_KEY = os.getenv("SUPABASE_JWT_SECRET", "your-secret-key-here")
+JWT_ALGORITHM = "HS256"
+
+# Supabase配置
+SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+    logger.error("❌ Supabase配置缺失！请检查环境变量。")
+    raise ValueError("Supabase configuration missing")
+
+# 创建Supabase客户端 - 使用官方库
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY)
+logger.info("✅ Supabase客户端初始化成功")
+
 if not OPENAI_API_KEY:
     logger.warning("OPENAI_API_KEY not found in .env file. Some functionalities might be affected if real OpenAI calls were intended.")
 
 if not AMAP_API_KEY:
-    logger.warning("AMAP_API_KEY not found in .env file. Geocoding service will not work.")
+    logger.warning("AMAP_API_KEY not found in .env file. Gecoding service will not work.")
 
 if not OPENWEATHERMAP_API_KEY:
     logger.warning("OPENWEATHERMAP_API_KEY not found in .env file. Weather service will not work.")
+
+# 安全相关
+security = HTTPBearer()
 
 app = FastAPI(
     title="生活小确幸 API",
@@ -51,11 +76,369 @@ app.add_middleware(
     allow_headers=["*"],  # 允许所有请求头
 )
 
+# 添加根路径路由
+@app.get("/", summary="API 首页", description="生活小确幸 API 服务首页")
+async def root():
+    """API 服务首页"""
+    return {
+        "message": "欢迎使用生活小确幸 API 服务！",
+        "version": "0.1.0",
+        "title": "生活小确幸 API",
+        "description": "API for recording and sharing small moments of happiness, with location and weather features.",
+        "endpoints": {
+            "posts": "/api/v1/posts",
+            "location": "/api/v1/location/reverse-geocode",
+            "weather": "/api/v1/weather/current",
+            "docs": "/docs"
+        },
+        "status": "running"
+    }
+
 logger.info("🚀 生活小确幸 API 服务启动成功")
 logger.info(f"🔑 API密钥配置状态:")
 logger.info(f"   - OpenAI API: {'✅ 已配置' if OPENAI_API_KEY else '❌ 未配置'}")
 logger.info(f"   - 高德地图 API: {'✅ 已配置' if AMAP_API_KEY else '❌ 未配置'}")
 logger.info(f"   - OpenWeatherMap API: {'✅ 已配置' if OPENWEATHERMAP_API_KEY else '❌ 未配置'}")
+logger.info(f"   - Supabase: {'✅ 已配置' if SUPABASE_URL else '❌ 未配置'}")
+
+# --- 用户认证相关 ---
+
+class User(BaseModel):
+    id: str
+    username: str
+    email: str
+    created_at: str
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+    """验证Supabase JWT token并返回用户信息"""
+    try:
+        logger.info(f"🔍 正在验证JWT token: {credentials.credentials[:20]}...")
+        
+        # 使用Supabase JWT Secret解码token
+        payload = jwt.decode(
+            credentials.credentials, 
+            JWT_SECRET_KEY, 
+            algorithms=[JWT_ALGORITHM],
+            options={"verify_aud": False}  # Supabase token可能没有aud字段
+        )
+        
+        logger.info(f"📋 Token payload: {payload}")
+        
+        user_id = payload.get("sub")
+        if user_id is None:
+            logger.error("❌ Token中缺少用户ID (sub字段)")
+            raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
+        
+        # 从token中获取用户信息
+        email = payload.get("email", "unknown@example.com")
+        username = payload.get("user_metadata", {}).get("nickname") or email.split('@')[0]
+        
+        # 查询用户详细信息（可选）
+        try:
+            result = supabase.table("user_profiles").select("*").eq("id", user_id).execute()
+            if result.data and len(result.data) > 0:
+                profile = result.data[0]
+                user = User(
+                    id=profile["id"],
+                    username=profile.get("nickname", username),
+                    email=email,
+                    created_at=profile.get("created_at", datetime.datetime.utcnow().isoformat())
+                )
+                logger.info(f"✅ 从数据库获取用户资料: {user.username}")
+            else:
+                # 如果数据库中没有用户资料，使用token中的信息
+                user = User(
+                    id=user_id,
+                    username=username,
+                    email=email,
+                    created_at=payload.get("created_at", datetime.datetime.utcnow().isoformat())
+                )
+                logger.info(f"✅ 使用token信息创建用户对象: {user.username}")
+        except Exception as db_error:
+            logger.warning(f"⚠️ 查询用户资料失败，使用token信息: {db_error}")
+            # 如果数据库查询失败，使用token中的信息
+            user = User(
+                id=user_id,
+                username=username,
+                email=email,
+                created_at=payload.get("created_at", datetime.datetime.utcnow().isoformat())
+            )
+        
+        logger.info(f"🔐 用户认证成功: {user.username} (ID: {user.id})")
+        return user
+        
+    except InvalidTokenError as e:
+        logger.error(f"❌ Token验证失败: {e}")
+        raise HTTPException(status_code=401, detail=f"Token验证失败: {str(e)}")
+    except Exception as e:
+        logger.error(f"❌ 认证过程中发生错误: {e}")
+        raise HTTPException(status_code=401, detail="认证失败")
+
+# --- 帖子相关模型 ---
+
+class PostLocation(BaseModel):
+    latitude: float
+    longitude: float
+    address: Optional[str] = None  # 改为可选字段，兼容现有数据
+
+class PostWeather(BaseModel):
+    temperature: float
+    description: Optional[str] = None  # 改为可选字段
+    icon_code: Optional[str] = None    # 改为可选字段
+    weather: Optional[str] = None      # 兼容现有数据中的weather字段
+    humidity: Optional[int] = None     # 兼容现有数据中的humidity字段
+
+class CreatePostRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500, description="帖子内容")
+    location: Optional[PostLocation] = Field(None, description="位置信息")
+    weather: Optional[PostWeather] = Field(None, description="天气信息")
+    image_url: Optional[str] = Field(None, description="单张图片URL")
+    audio_url: Optional[str] = Field(None, description="音频URL")
+
+class Post(BaseModel):
+    id: str
+    user_id: str
+    username: str
+    content: str
+    location: Optional[PostLocation]
+    weather: Optional[PostWeather]
+    image_url: Optional[str]
+    audio_url: Optional[str]
+    created_at: str
+    updated_at: str
+    likes_count: int = 0
+    comments_count: int = 0
+    rewards_count: int = 0
+    rewards_amount: float = 0.0
+
+class PostResponse(BaseModel):
+    data: Post
+    message: str
+
+class PostListResponse(BaseModel):
+    data: List[Post]
+    pagination: Dict[str, Any]
+    message: str
+
+# --- 帖子API端点 ---
+
+@app.post(
+    "/api/v1/posts",
+    response_model=PostResponse,
+    summary="创建新帖子",
+    description="创建一个新的生活小确幸帖子"
+)
+async def create_post(
+    post_data: CreatePostRequest,
+    current_user: User = Depends(verify_token)
+):
+    """创建新帖子"""
+    try:
+        logger.info(f"📝 用户 {current_user.username} 正在创建新帖子")
+        
+        # 准备保存到数据库的数据
+        post_record = {
+            "user_id": current_user.id,
+            "content": post_data.content,
+            "image_url": post_data.image_url,
+            "audio_url": post_data.audio_url,
+            "location_data": post_data.location.dict() if post_data.location else None,
+            "weather_data": post_data.weather.dict() if post_data.weather else None,
+        }
+        
+        logger.info(f"📋 准备插入数据库的记录: {post_record}")
+        
+        # 插入到Supabase数据库 - 使用官方库
+        result = supabase.table("posts").insert(post_record).execute()
+        
+        if not result.data or len(result.data) == 0:
+            logger.error("❌ 数据库插入失败：无返回数据")
+            raise HTTPException(status_code=500, detail="创建帖子失败")
+            
+        created_post = result.data[0]
+        logger.info(f"✅ 帖子创建成功: ID={created_post['id']}")
+        
+        # 构建返回的Post对象
+        post = Post(
+            id=created_post["id"],
+            user_id=created_post["user_id"],
+            username=current_user.username,
+            content=created_post["content"],
+            location=PostLocation(**created_post["location_data"]) if created_post.get("location_data") else None,
+            weather=PostWeather(**created_post["weather_data"]) if created_post.get("weather_data") else None,
+            image_url=created_post.get("image_url"),
+            audio_url=created_post.get("audio_url"),
+            created_at=created_post["created_at"],
+            updated_at=created_post["updated_at"],
+            likes_count=created_post.get("likes_count", 0),
+            comments_count=created_post.get("comments_count", 0),
+            rewards_count=created_post.get("rewards_count", 0),
+            rewards_amount=float(created_post.get("rewards_amount", 0.0))
+        )
+        
+        return PostResponse(
+            data=post,
+            message="帖子创建成功！"
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ 创建帖子时发生错误: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "POST_CREATION_FAILED", "message": f"创建帖子失败: {str(e)}"}}
+        )
+
+@app.get(
+    "/api/v1/posts",
+    response_model=PostListResponse,
+    summary="获取帖子列表",
+    description="获取生活小确幸帖子列表，支持分页和排序"
+)
+async def get_posts(
+    page: int = Query(1, ge=1, description="页码"),
+    limit: int = Query(20, ge=1, le=100, description="每页数量"),
+    sort_type: str = Query("latest", enum=["latest", "popular"], description="排序方式")
+):
+    """获取帖子列表"""
+    try:
+        logger.info(f"📋 获取帖子列表: page={page}, limit={limit}, sort={sort_type}")
+        
+        # 计算偏移量
+        offset = (page - 1) * limit
+        
+        # 设置排序
+        order_field = "created_at" if sort_type == "latest" else "likes_count"
+        
+        # 查询帖子数据 - 使用官方库
+        query = supabase.table("posts").select(
+            "id, user_id, content, image_url, audio_url, location_data, weather_data, "
+            "created_at, updated_at, likes_count, comments_count, rewards_count, rewards_amount"
+        ).eq("is_deleted", False)
+        
+        if sort_type == "latest":
+            query = query.order("created_at", desc=True)
+        else:
+            query = query.order("likes_count", desc=True)
+        
+        result = query.range(offset, offset + limit - 1).execute()
+        posts_data = result.data if result.data else []
+        
+        # 获取总数
+        count_result = supabase.table("posts").select("*", count="exact").eq("is_deleted", False).execute()
+        total_count = count_result.count if hasattr(count_result, 'count') and count_result.count else 0
+        
+        # 转换为Post模型
+        posts = []
+        for post_data in posts_data:
+            try:
+                # 这里先使用默认用户名，后续可以优化为联表查询
+                post = Post(
+                    id=post_data["id"],
+                    user_id=post_data["user_id"],
+                    username="用户",  # 暂时使用默认值
+                    content=post_data["content"],
+                    location=PostLocation(**post_data["location_data"]) if post_data.get("location_data") else None,
+                    weather=PostWeather(**post_data["weather_data"]) if post_data.get("weather_data") else None,
+                    image_url=post_data.get("image_url"),
+                    audio_url=post_data.get("audio_url"),
+                    created_at=post_data["created_at"],
+                    updated_at=post_data["updated_at"],
+                    likes_count=post_data.get("likes_count", 0),
+                    comments_count=post_data.get("comments_count", 0),
+                    rewards_count=post_data.get("rewards_count", 0),
+                    rewards_amount=float(post_data.get("rewards_amount", 0.0))
+                )
+                posts.append(post)
+            except Exception as e:
+                logger.warning(f"⚠️ 解析帖子数据失败: {e}, 跳过该帖子")
+                continue
+        
+        # 分页信息
+        total_pages = (total_count + limit - 1) // limit if total_count else 0
+        
+        pagination = {
+            "current_page": page,
+            "total_pages": total_pages,
+            "total_items": total_count,
+            "items_per_page": limit,
+            "has_next": page < total_pages,
+            "has_prev": page > 1
+        }
+        
+        logger.info(f"✅ 成功获取 {len(posts)} 个帖子，总数: {total_count}")
+        
+        return PostListResponse(
+            data=posts,
+            pagination=pagination,
+            message="帖子列表获取成功"
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ 获取帖子列表时发生错误: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "POSTS_FETCH_FAILED", "message": f"获取帖子列表失败: {str(e)}"}}
+        )
+
+@app.get(
+    "/api/v1/posts/{post_id}",
+    response_model=PostResponse,
+    summary="获取单个帖子",
+    description="根据ID获取单个帖子详情"
+)
+async def get_post(post_id: str):
+    """获取单个帖子"""
+    try:
+        logger.info(f"🔍 获取帖子详情: post_id={post_id}")
+        
+        # 从数据库查询帖子 - 使用官方库
+        result = supabase.table("posts").select(
+            "id, user_id, content, image_url, audio_url, location_data, weather_data, "
+            "created_at, updated_at, likes_count, comments_count, rewards_count, rewards_amount"
+        ).eq("id", post_id).eq("is_deleted", False).execute()
+        
+        if not result.data or len(result.data) == 0:
+            logger.warning(f"⚠️ 帖子不存在: post_id={post_id}")
+            raise HTTPException(
+                status_code=404,
+                detail={"error": {"code": "POST_NOT_FOUND", "message": "帖子不存在"}}
+            )
+        
+        post_data = result.data[0]
+        
+        # 构建Post对象
+        post = Post(
+            id=post_data["id"],
+            user_id=post_data["user_id"],
+            username="用户",  # 暂时使用默认值
+            content=post_data["content"],
+            location=PostLocation(**post_data["location_data"]) if post_data.get("location_data") else None,
+            weather=PostWeather(**post_data["weather_data"]) if post_data.get("weather_data") else None,
+            image_url=post_data.get("image_url"),
+            audio_url=post_data.get("audio_url"),
+            created_at=post_data["created_at"],
+            updated_at=post_data["updated_at"],
+            likes_count=post_data.get("likes_count", 0),
+            comments_count=post_data.get("comments_count", 0),
+            rewards_count=post_data.get("rewards_count", 0),
+            rewards_amount=float(post_data.get("rewards_amount", 0.0))
+        )
+        
+        logger.info(f"✅ 成功获取帖子: {post_id}")
+        
+        return PostResponse(
+            data=post,
+            message="帖子详情获取成功"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ 获取帖子详情时发生错误: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": {"code": "POST_FETCH_FAILED", "message": f"获取帖子详情失败: {str(e)}"}}
+        )
 
 # --- Helper Models (Shared or common structures) ---
 class Coordinates(BaseModel):

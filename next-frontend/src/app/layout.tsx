@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { AuthProvider } from '@/components/providers/AuthProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -14,7 +15,9 @@ const RootLayout = ({ children }: RootLayoutProps) => {
   return (
     <html lang="zh-CN">
       <body className="min-h-screen bg-gradient-to-br from-journal-yellow via-journal-pink to-journal-light-pink">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )

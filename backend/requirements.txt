@@ -1,0 +1,36 @@
+# FastAPI 核心依赖
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# 数据库和认证
+supabase==2.0.2
+
+# HTTP 客户端
+httpx==0.25.2
+
+# 数据验证和序列化
+pydantic==2.5.0
+
+# 环境变量管理
+python-dotenv==1.0.0
+
+# 文件上传处理
+python-multipart==0.0.6
+
+# 日期时间处理
+python-dateutil==2.8.2
+
+# JSON 处理
+orjson==3.9.10
+
+# 密码加密
+passlib[bcrypt]==1.7.4
+
+# JWT 处理
+python-jose[cryptography]==3.3.0
+
+# 异步支持
+asyncio==3.4.3
+
+# 类型检查
+typing-extensions==4.8.0 
