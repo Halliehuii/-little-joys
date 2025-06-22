@@ -15,9 +15,34 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 import json
 from dotenv import load_dotenv
+from pathlib import Path
 
-# 加载环境变量
-load_dotenv()
+# 获取项目根目录路径（backend目录的上一级）
+ROOT_DIR = Path(__file__).parent.parent
+ENV_PATH = ROOT_DIR / ".env"
+
+# 加载环境变量，指定具体路径
+load_dotenv(dotenv_path=ENV_PATH)
+
+# 验证必要的环境变量
+SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# 环境变量验证
+if not SUPABASE_URL:
+    raise ValueError("NEXT_PUBLIC_SUPABASE_URL 环境变量未设置")
+
+if not SUPABASE_KEY:
+    raise ValueError("SUPABASE_SERVICE_ROLE_KEY 环境变量未设置")
+
+# 验证 URL 格式
+if not SUPABASE_URL.startswith(('http://', 'https://')):
+    raise ValueError(f"SUPABASE_URL 格式不正确: {SUPABASE_URL}")
+
+print(f"✅ 环境变量加载成功:")
+print(f"   SUPABASE_URL: {SUPABASE_URL}")
+print(f"   ENV_PATH: {ENV_PATH}")
+print(f"   ENV_EXISTS: {ENV_PATH.exists()}")
 
 # 应用配置
 app = FastAPI(
@@ -36,8 +61,6 @@ app.add_middleware(
 )
 
 # Supabase配置
-SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # API密钥配置
@@ -70,11 +93,11 @@ class CommentCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=200)
 
 class RewardCreate(BaseModel):
-    payment_method: str = Field(..., regex="^(wechat|alipay)$")
+    payment_method: str = Field(..., pattern="^(wechat|alipay)$")
     transaction_id: str = Field(..., min_length=1)
 
 class PaymentAccountCreate(BaseModel):
-    payment_type: str = Field(..., regex="^(wechat|alipay)$")
+    payment_type: str = Field(..., pattern="^(wechat|alipay)$")
     account_info: Dict[str, Any]
     real_name: str = Field(..., max_length=50)
 
