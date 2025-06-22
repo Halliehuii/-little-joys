@@ -13,8 +13,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 使用高德地图API获取地址
-    const amapKey = '43b289c4722b57ab060dea621064e4a8';
+    // 使用环境变量获取高德地图API密钥
+    const amapKey = process.env.AMAP_API_KEY;
+    if (!amapKey) {
+      return NextResponse.json(
+        { error: '地图服务配置错误' },
+        { status: 500 }
+      );
+    }
+    
     const response = await fetch(
       `https://restapi.amap.com/v3/geocode/regeo?location=${longitude},${latitude}&key=${amapKey}&radius=1000&extensions=all&batch=false&roadlevel=0`,
       {

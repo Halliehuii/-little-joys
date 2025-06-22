@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { getApiBaseUrl } from '@/lib/api'
 
 export default function TestLocationPage() {
   const [results, setResults] = useState<Array<{ name: string; location: string; status: string }>>([])
@@ -19,10 +20,12 @@ export default function TestLocationPage() {
     setIsLoading(true)
     setResults([])
     
+    const apiBaseUrl = getApiBaseUrl()
+    
     for (const loc of testLocations) {
       try {
         const response = await fetch(
-          `http://localhost:8000/api/v1/location/reverse-geocode?latitude=${loc.lat}&longitude=${loc.lon}&lang=zh-CN`
+          `${apiBaseUrl}/api/v1/location/reverse-geocode?latitude=${loc.lat}&longitude=${loc.lon}&lang=zh-CN`
         )
         
         if (response.ok) {
@@ -58,12 +61,14 @@ export default function TestLocationPage() {
     }
 
     setIsLoading(true)
+    const apiBaseUrl = getApiBaseUrl()
+    
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
           const { latitude, longitude } = position.coords
           const response = await fetch(
-            `http://localhost:8000/api/v1/location/reverse-geocode?latitude=${latitude}&longitude=${longitude}&lang=zh-CN`
+            `${apiBaseUrl}/api/v1/location/reverse-geocode?latitude=${latitude}&longitude=${longitude}&lang=zh-CN`
           )
           
           if (response.ok) {
@@ -115,58 +120,49 @@ export default function TestLocationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 to-pink-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50 p-4">
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-            地点获取功能测试页面
-          </h1>
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">位置服务测试</h1>
+          <p className="text-gray-600 mb-6">测试地理编码API的功能</p>
+          <p className="text-sm text-blue-600 mb-6">当前API地址: {getApiBaseUrl()}</p>
           
-          <div className="space-y-4 mb-8">
-            <button
-              onClick={testUserLocation}
-              disabled={isLoading}
-              className="w-full px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 text-lg font-semibold"
-            >
-              {isLoading ? '获取中...' : '🎯 测试获取您的真实位置'}
-            </button>
-            
+          <div className="flex gap-4 mb-6">
             <button
               onClick={testAllLocations}
               disabled={isLoading}
-              className="w-full px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 text-lg font-semibold"
+              className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors"
             >
-              {isLoading ? '测试中...' : '🌍 测试全球多个城市位置'}
+              {isLoading ? '测试中...' : '测试所有位置'}
+            </button>
+            
+            <button
+              onClick={testUserLocation}
+              disabled={isLoading}
+              className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              {isLoading ? '获取中...' : '测试当前位置'}
             </button>
           </div>
 
           {results.length > 0 && (
-            <div className="bg-gray-50 rounded-xl p-6">
-              <h2 className="text-xl font-semibold mb-4 text-gray-800">测试结果：</h2>
-              <div className="space-y-3">
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-gray-800">测试结果</h2>
+              <div className="space-y-2">
                 {results.map((result, index) => (
-                  <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div key={index} className="bg-gray-50 p-4 rounded-lg">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-semibold text-gray-800">{result.name}</h3>
+                        <h3 className="font-medium text-gray-800">{result.name}</h3>
                         <p className="text-gray-600 mt-1">{result.location}</p>
                       </div>
-                      <span className="text-sm font-medium">{result.status}</span>
+                      <span className="text-sm">{result.status}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          <div className="mt-8 text-center">
-            <a
-              href="/"
-              className="text-blue-500 hover:text-blue-700 underline"
-            >
-              ← 返回主页
-            </a>
-          </div>
         </div>
       </div>
     </div>

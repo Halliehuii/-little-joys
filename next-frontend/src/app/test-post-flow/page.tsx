@@ -137,8 +137,12 @@ export default function TestPostFlowPage() {
 
       // 步骤4: 检查后端连接
       console.log('步骤4: 检查后端连接...')
+      
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        // 动态获取API基础URL
+        const { getApiBaseUrl } = await import('@/lib/api')
+        const backendUrl = getApiBaseUrl()
+        
         const backendResponse = await fetch(`${backendUrl}/health`)
         
         if (backendResponse.ok) {
@@ -146,7 +150,7 @@ export default function TestPostFlowPage() {
           results.step4_checkBackend = {
             success: true,
             message: '后端服务正常',
-            data: backendData
+            data: { ...backendData, apiUrl: backendUrl }
           }
         } else {
           results.step4_checkBackend = {

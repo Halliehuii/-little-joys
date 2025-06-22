@@ -13,8 +13,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 使用OpenWeatherMap API获取天气
-    const openWeatherKey = '81b4644978b9d318ce05086216191e10';
+    // 使用环境变量获取OpenWeatherMap API密钥
+    const openWeatherKey = process.env.OPENWEATHERMAP_API_KEY;
+    if (!openWeatherKey) {
+      return NextResponse.json(
+        { error: '天气服务配置错误' },
+        { status: 500 }
+      );
+    }
+    
     const response = await fetch(
       `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${openWeatherKey}&units=metric&lang=zh_cn`,
       {

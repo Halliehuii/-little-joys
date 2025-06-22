@@ -22,6 +22,10 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
   const [weather, setWeather] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // 添加加载状态
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -61,33 +65,136 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
     }
   };
 
-  // 自动获取位置
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      alert('您的浏览器不支持地理位置功能');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        // 这里应该调用地理编码API将坐标转换为地址
-        // 暂时用模拟数据
-        setLocation('北京市朝阳区');
-      },
-      (error) => {
-        console.error('获取位置失败:', error);
-        alert('获取位置失败，请手动输入');
+  // 自动获取位置 - 使用真实API
+  const handleGetLocation = async () => {
+    setLocationLoading(true);
+    
+    try {
+      if (!navigator.geolocation) {
+        throw new Error('您的浏览器不支持地理位置功能');
       }
-    );
+
+      // 获取用户坐标
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 300000
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      console.log('获取到的坐标:', latitude, longitude);
+
+      // 调用服务器端API路由获取地址
+      const response = await fetch(`/api/location?lat=${latitude}&lng=${longitude}`);
+      
+      if (!response.ok) {
+        throw new Error('获取地址信息失败');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setLocation(data.address);
+        alert(`📍 定位成功！获取到地址：${data.address}`);
+      } else {
+        throw new Error(data.error || '地址解析失败');
+      }
+      
+    } catch (error) {
+      console.error('位置获取错误:', error);
+      
+      let errorMessage = '获取位置失败';
+      if (error instanceof GeolocationPositionError) {
+        switch (error.code) {
+          case 1:
+            errorMessage = '请允许访问您的位置信息';
+            break;
+          case 2:
+            errorMessage = '无法获取您的位置信息';
+            break;
+          case 3:
+            errorMessage = '获取位置信息超时';
+            break;
+          default:
+            errorMessage = '获取位置信息失败';
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      alert(`${errorMessage}，请手动输入位置信息`);
+      setLocation('请手动输入位置');
+    } finally {
+      setLocationLoading(false);
+    }
   };
 
-  // 自动获取天气
-  const handleGetWeather = () => {
-    // 这里应该调用天气API
-    // 暂时用模拟数据
-    const weathers = ['晴天', '多云', '小雨', '阴天', '雪'];
-    const randomWeather = weathers[Math.floor(Math.random() * weathers.length)];
-    setWeather(`${randomWeather} 22°C`);
+  // 自动获取天气 - 使用真实API
+  const handleGetWeather = async () => {
+    setWeatherLoading(true);
+    
+    try {
+      if (!navigator.geolocation) {
+        throw new Error('您的浏览器不支持位置服务');
+      }
+
+      // 获取用户坐标
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 300000
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      console.log('获取天气坐标:', latitude, longitude);
+
+      // 调用服务器端API路由获取天气
+      const response = await fetch(`/api/weather?lat=${latitude}&lng=${longitude}`);
+      
+      if (!response.ok) {
+        throw new Error('获取天气信息失败');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setWeather(data.weather);
+        alert(`🌤️ 天气获取成功！${data.details.location}：${data.weather}`);
+      } else {
+        throw new Error(data.error || '天气解析失败');
+      }
+      
+    } catch (error) {
+      console.error('天气获取错误:', error);
+      
+      let errorMessage = '获取天气失败';
+      if (error instanceof GeolocationPositionError) {
+        switch (error.code) {
+          case 1:
+            errorMessage = '请允许访问您的位置信息';
+            break;
+          case 2:
+            errorMessage = '无法获取您的位置信息';
+            break;
+          case 3:
+            errorMessage = '获取位置信息超时';
+            break;
+          default:
+            errorMessage = '获取位置信息失败';
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      alert(`${errorMessage}，请手动输入天气信息`);
+      setWeather('请手动输入天气');
+    } finally {
+      setWeatherLoading(false);
+    }
   };
 
   // 提交表单
@@ -238,15 +345,23 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  placeholder="不添加地点"
+                  placeholder="北京市朝阳区"
                   className="flex-1 p-3 border border-yellow-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-transparent bg-white"
                 />
                 <button
                   type="button"
                   onClick={handleGetLocation}
-                  className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors whitespace-nowrap"
+                  disabled={locationLoading}
+                  className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  📍 自动获取位置
+                  {locationLoading ? (
+                    <>
+                      <span className="animate-spin mr-1">⏳</span>
+                      获取中...
+                    </>
+                  ) : (
+                    <>📍 自动获取位置</>
+                  )}
                 </button>
               </div>
             </div>
@@ -259,15 +374,23 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
                   type="text"
                   value={weather}
                   onChange={(e) => setWeather(e.target.value)}
-                  placeholder="不添加天气"
+                  placeholder="明天 22°C"
                   className="flex-1 p-3 border border-yellow-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-transparent bg-white"
                 />
                 <button
                   type="button"
                   onClick={handleGetWeather}
-                  className="px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors whitespace-nowrap"
+                  disabled={weatherLoading}
+                  className="px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  🌤️ 自动获取天气
+                  {weatherLoading ? (
+                    <>
+                      <span className="animate-spin mr-1">⏳</span>
+                      获取中...
+                    </>
+                  ) : (
+                    <>🌤️ 自动获取天气</>
+                  )}
                 </button>
               </div>
             </div>

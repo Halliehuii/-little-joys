@@ -16,13 +16,41 @@ from datetime import datetime
 import json
 from dotenv import load_dotenv
 from pathlib import Path
+import logging
+
+# ================================
+# 环境配置
+# ================================
 
 # 获取项目根目录路径（backend目录的上一级）
 ROOT_DIR = Path(__file__).parent.parent
-ENV_PATH = ROOT_DIR / ".env"
 
-# 加载环境变量，指定具体路径
-load_dotenv(dotenv_path=ENV_PATH)
+# 检测环境并加载对应的环境变量文件
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+print(f"🌍 当前环境: {ENVIRONMENT}")
+
+if ENVIRONMENT == "production":
+    # 生产环境：直接使用环境变量，不需要.env文件
+    print("📦 生产环境：使用系统环境变量")
+elif ENVIRONMENT == "development":
+    # 开发环境：加载.env.development文件
+    ENV_PATH = ROOT_DIR / ".env.development"
+    if ENV_PATH.exists():
+        load_dotenv(dotenv_path=ENV_PATH)
+        print(f"📦 开发环境：加载 {ENV_PATH}")
+    else:
+        # 回退到默认.env文件
+        ENV_PATH = ROOT_DIR / ".env"
+        load_dotenv(dotenv_path=ENV_PATH)
+        print(f"📦 开发环境：加载默认 {ENV_PATH}")
+else:
+    # 其他环境：尝试加载对应的环境文件
+    ENV_PATH = ROOT_DIR / f".env.{ENVIRONMENT}"
+    if ENV_PATH.exists():
+        load_dotenv(dotenv_path=ENV_PATH)
+        print(f"📦 {ENVIRONMENT}环境：加载 {ENV_PATH}")
+    else:
+        print(f"⚠️ 未找到环境文件 {ENV_PATH}，使用系统环境变量")
 
 # 验证必要的环境变量
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
@@ -41,24 +69,96 @@ if not SUPABASE_URL.startswith(('http://', 'https://')):
 
 print(f"✅ 环境变量加载成功:")
 print(f"   SUPABASE_URL: {SUPABASE_URL}")
-print(f"   ENV_PATH: {ENV_PATH}")
-print(f"   ENV_EXISTS: {ENV_PATH.exists()}")
+print(f"   ENVIRONMENT: {ENVIRONMENT}")
 
+# ================================
+# 日志配置
+# ================================
+
+# 配置日志级别
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO" if ENVIRONMENT == "production" else "DEBUG")
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# ================================
 # 应用配置
+# ================================
+
 app = FastAPI(
     title="生活小确幸 API",
     description="记录生活中每一个温暖的小瞬间",
-    version="1.0.0"
+    version="1.0.0",
+    # 生产环境隐藏文档
+    docs_url="/docs" if ENVIRONMENT != "production" else None,
+    redoc_url="/redoc" if ENVIRONMENT != "production" else None,
 )
 
+# ================================
 # CORS配置
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 生产环境中应该限制具体域名
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ================================
+
+# 根据环境配置CORS
+if ENVIRONMENT == "production":
+    # 生产环境：严格的CORS配置
+    ALLOWED_ORIGINS = [
+        "https://littlejoys.xyz",
+        "https://www.littlejoys.xyz",
+        "https://api.littlejoys.xyz",
+        # 可以根据需要添加其他域名
+    ]
+    
+    # 从环境变量获取额外的允许域名
+    extra_origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    if extra_origins:
+        ALLOWED_ORIGINS.extend([origin.strip() for origin in extra_origins.split(",")])
+    
+    logger.info(f"生产环境CORS允许的域名: {ALLOWED_ORIGINS}")
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+else:
+    # 开发环境：宽松的CORS配置
+    logger.info("开发环境：使用宽松的CORS配置")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # 开发环境允许所有域名
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+# ================================
+# 健康检查端点
+# ================================
+
+@app.get("/health")
+async def health_check():
+    """健康检查端点"""
+    return {
+        "status": "healthy",
+        "environment": ENVIRONMENT,
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
+    }
+
+@app.get("/")
+async def root():
+    """根路径"""
+    return {
+        "message": "生活小确幸 API",
+        "environment": ENVIRONMENT,
+        "docs_url": "/docs" if ENVIRONMENT != "production" else "文档在生产环境中已隐藏",
+        "health_check": "/health"
+    }
 
 # Supabase配置
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -569,4 +669,34 @@ async def startup_event():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    
+    # 根据环境配置启动参数
+    if ENVIRONMENT == "production":
+        # 生产环境配置
+        HOST = os.getenv("HOST", "0.0.0.0")
+        PORT = int(os.getenv("PORT", "8000"))
+        
+        logger.info(f"🚀 生产环境启动: {HOST}:{PORT}")
+        uvicorn.run(
+            app, 
+            host=HOST, 
+            port=PORT,
+            log_level="info",
+            access_log=True,
+            # 生产环境建议的配置
+            workers=1,  # Zeabur等平台通常只需要1个worker
+        )
+    else:
+        # 开发环境配置
+        HOST = os.getenv("HOST", "0.0.0.0")
+        PORT = int(os.getenv("PORT", "8000"))
+        
+        logger.info(f"🔧 开发环境启动: {HOST}:{PORT}")
+        uvicorn.run(
+            app, 
+            host=HOST, 
+            port=PORT,
+            reload=True,  # 开发环境启用热重载
+            log_level="debug",
+            access_log=True,
+        ) 

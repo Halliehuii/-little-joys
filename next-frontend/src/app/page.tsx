@@ -34,14 +34,25 @@ export default function HomePage() {
 
   // 获取帖子数据
   const fetchPosts = async () => {
+    console.log('🚀 开始获取帖子数据...')
     try {
       setLoading(true)
-      const response = await fetch('/api/v1/posts?page=1&limit=20&sort_type=latest')
-      const result = await response.json()
+      console.log('📡 发送API请求到: /api/posts')
       
-      // 修复数据格式处理 - 直接使用后端返回的格式
+      const response = await fetch('/api/posts?page=1&limit=20&sort_type=latest')
+      console.log('📥 收到响应，状态:', response.status)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      console.log('📋 API响应数据:', result)
+      
+      // 检查数据格式
       if (result.data && Array.isArray(result.data)) {
-        // 转换后端数据格式为前端格式
+        console.log('✅ 数据格式正确，开始转换...')
+        // 简化数据转换
         const transformedPosts = result.data.map((post: any) => ({
           id: post.id,
           content: post.content,
@@ -51,27 +62,30 @@ export default function HomePage() {
           comments_count: post.comments_count || 0,
           rewards_count: post.rewards_count || 0,
           user: {
-            nickname: post.username || '用户',
+            nickname: post.username || '匿名用户',
             avatar_url: undefined
           },
-          location_data: post.location ? { name: `位置 (${post.location.latitude}, ${post.location.longitude})` } : undefined,
-          weather_data: post.weather ? { 
-            description: post.weather.weather || post.weather.description || '未知天气', 
+          location_data: post.location?.address ? { name: post.location.address } : undefined,
+          weather_data: post.weather?.description ? { 
+            description: post.weather.description, 
             temperature: post.weather.temperature || 0 
           } : undefined
         }))
+        
+        console.log('🎯 转换后的帖子数据:', transformedPosts)
         setPosts(transformedPosts)
-        console.log(`✅ 成功获取 ${transformedPosts.length} 个帖子`)
+        console.log(`✅ 成功设置 ${transformedPosts.length} 个帖子`)
       } else {
-        // 如果API失败，使用模拟数据作为后备
-        console.warn('API返回格式异常，使用模拟数据')
+        console.warn('⚠️ API返回数据格式异常:', result)
+        console.log('🔄 使用模拟数据')
         setPosts(mockPosts)
       }
     } catch (error) {
-      console.error('获取帖子失败:', error)
-      // 使用模拟数据作为后备
+      console.error('❌ 获取帖子失败:', error)
+      console.log('🔄 使用模拟数据')
       setPosts(mockPosts)
     } finally {
+      console.log('🏁 设置loading为false')
       setLoading(false)
     }
   }
@@ -210,45 +224,42 @@ export default function HomePage() {
     }
 
     try {
-      // 获取认证token
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        alert('登录已过期，请重新登录');
-        return;
-      }
+      // 使用API工具发送请求，自动处理认证
+      const { apiRequest } = await import('@/lib/api')
+      
+      const response = await apiRequest.post('/api/posts', {
+        content: postData.content,
+        image_url: postData.image ? 'placeholder' : undefined, // 临时处理图片上传
+        location: postData.location ? {
+          latitude: 0,
+          longitude: 0,
+          address: postData.location
+        } : undefined,
+        weather: postData.weather ? {
+          temperature: 22,
+          description: postData.weather
+        } : undefined
+      })
 
-      // 调用API创建帖子
-      const response = await fetch('/api/posts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          content: postData.content,
-          image: postData.image,
-          location: postData.location,
-          weather: postData.weather
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || '发布失败');
-      }
-
-      if (result.success) {
+      if (response.data) {
         // 重新获取帖子列表以显示新内容
-        await fetchPosts();
-        setShowCreatePost(false);
-        alert('发布成功！');
+        await fetchPosts()
+        setShowCreatePost(false)
+        alert('发布成功！')
       } else {
-        throw new Error(result.message || '发布失败');
+        throw new Error(response.message || '发布失败')
       }
-    } catch (error) {
-      console.error('发布失败:', error);
-      alert('发布失败，请重试');
+    } catch (error: any) {
+      console.error('发布失败:', error)
+      
+      // 如果是认证错误，不需要额外处理，API拦截器已经处理了
+      if (error.response?.status === 401) {
+        return // 让API拦截器处理认证失败
+      }
+      
+      // 其他错误显示具体信息
+      const errorMessage = error.response?.data?.message || error.message || '发布失败，请重试'
+      alert(errorMessage)
     }
   }
 
@@ -277,6 +288,31 @@ export default function HomePage() {
               <span className="text-2xl">✨</span>
               <span className="font-medium">写一件幸福小事</span>
             </button>
+            
+            {/* 开发环境下的调试按钮 */}
+            {process.env.NODE_ENV === 'development' && (
+              <>
+                <button
+                  onClick={async () => {
+                    const { debugAuthState } = await import('@/lib/auth')
+                    const state = debugAuthState()
+                    alert(`认证状态:\n- 有Token: ${state.hasToken}\n- Token有效: ${state.tokenValid}\n- 已认证: ${state.isAuthenticated}\n\n详细信息请查看控制台`)
+                  }}
+                  className="mt-2 text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-300 mr-2"
+                >
+                  🔍 调试认证状态
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('🔄 手动触发数据获取')
+                    fetchPosts()
+                  }}
+                  className="mt-2 text-xs bg-blue-200 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-300"
+                >
+                  🔄 重新获取数据
+                </button>
+              </>
+            )}
           </div>
         )}
 

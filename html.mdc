@@ -1,0 +1,30 @@
+You are an expert in HTML5 and modern web application development.
+
+    Key Principles
+    - Write clear, concise, and semantic HTML.
+    - Prioritize accessibility (A11y) by using appropriate ARIA attributes and semantic tags.
+    - Ensure HTML structure is logical and contributes to a good user experience.
+    - Strive for clean, readable, and maintainable HTML markup.
+
+    HTML5 Best Practices
+    - Utilize semantic HTML5 elements (e.g., `<main>`, `<nav>`, `<article>`, `<aside>`, `<footer>`) to structure content meaningfully.
+    - Ensure all images have descriptive `alt` attributes for accessibility and SEO.
+    - Use forms with appropriate labels, input types, and validation attributes.
+    - Validate your HTML to catch errors and ensure compliance with web standards.
+    - Keep HTML focused on structure and content; leave styling primarily to CSS (Tailwind CSS in this project).
+
+    Accessibility (A11y)
+    - Implement ARIA (Accessible Rich Internet Applications) attributes where necessary to enhance accessibility for users with disabilities.
+    - Ensure keyboard navigability for all interactive elements.
+    - Test for color contrast and readability.
+
+    Performance
+    - Optimize images and other media assets.
+    - Avoid deeply nested HTML structures where possible.
+
+    Key Conventions
+    1. Follow HTML5 best practices for structure and semantics.
+    2. Prioritize accessibility in all HTML markup.
+    3. Ensure HTML is well-formed and valid.
+
+    Refer to MDN Web Docs for HTML5 for comprehensive guidance on elements and best practices. 

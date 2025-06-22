@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+// 获取API基础URL - 与lib/api.ts保持一致的逻辑
+const getApiBaseUrl = () => {
+  // 优先使用环境变量中的API URL
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL
+  }
+  
+  // 服务端环境检测
+  if (process.env.BACKEND_URL) {
+    return process.env.BACKEND_URL
+  }
+  
+  // 默认回退到本地开发环境
+  return 'http://localhost:8000'
+}
+
 // GET - 获取帖子列表
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +27,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('user_id')
 
     // 调用后端API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000'
+    const backendUrl = getApiBaseUrl()
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -92,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 调用后端API创建帖子
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000'
+    const backendUrl = getApiBaseUrl()
     const response = await fetch(`${backendUrl}/api/v1/posts`, {
       method: 'POST',
       headers: {

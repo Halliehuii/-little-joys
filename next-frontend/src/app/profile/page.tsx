@@ -70,6 +70,54 @@ export default function ProfilePage() {
   // 使用Zustand store获取认证状态
   const { user, isAuthenticated, isLoading: authLoading, clearUser } = useAuthStore();
 
+  // 模拟用户发布的内容（作为后备）
+  const mockUserPosts: Post[] = [
+    {
+      id: '1',
+      content: '今天阳光特别好，在阳台上晒了一下午的太阳，感觉整个人都被治愈了。简单的幸福就是这样，不需要多么复杂。',
+      image_url: '/placeholder-sunny.jpg',
+      created_at: '2024-12-13T14:00:00Z',
+      likes_count: 45,
+      comments_count: 8,
+      rewards_count: 5,
+      user: {
+        nickname: user?.email?.split('@')[0] || '用户',
+        avatar_url: user?.user_metadata?.avatar_url,
+      },
+      weather_data: {
+        description: '晴天',
+        temperature: 24,
+      },
+    },
+    {
+      id: '2',
+      content: '和朋友们一起去了新开的咖啡店，点了一杯拿铁，配上店里温暖的灯光，聊了很久很久。友谊真的是生活中最珍贵的财富。',
+      created_at: '2024-12-12T16:30:00Z',
+      likes_count: 67,
+      comments_count: 12,
+      rewards_count: 8,
+      user: {
+        nickname: user?.email?.split('@')[0] || '用户',
+        avatar_url: user?.user_metadata?.avatar_url,
+      },
+      location_data: {
+        name: '温馨咖啡屋',
+      },
+    },
+    {
+      id: '3',
+      content: '收到了远方朋友寄来的明信片，上面写着"想你了"三个字。虽然简单，但是比任何华丽的辞藻都要温暖。',
+      created_at: '2024-12-11T20:00:00Z',
+      likes_count: 89,
+      comments_count: 15,
+      rewards_count: 12,
+      user: {
+        nickname: user?.email?.split('@')[0] || '用户',
+        avatar_url: user?.user_metadata?.avatar_url,
+      },
+    },
+  ];
+
   // 检查登录状态
   useEffect(() => {
     // 等待认证状态初始化完成
@@ -99,126 +147,113 @@ export default function ProfilePage() {
         location: currentUserInfo.location || '',
       });
 
-      // 模拟用户统计数据
-      setUserStats({
-        postsCount: 25,
-        likesReceived: 342,
-        rewardsReceived: 68,
-        commentsReceived: 156,
-      });
+      // 获取真实的用户统计数据
+      fetchUserStats();
     }
 
     // 获取用户帖子数据
-    const fetchUserPosts = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('access_token');
-        
-        if (!token) {
-          toast.error('登录已过期，请重新登录');
-          router.push('/login');
-          return;
-        }
-
-        // 获取所有帖子
-        const response = await fetch('/api/posts?page=1&limit=50&sort_type=latest');
-        const result = await response.json();
-        
-        // 修复数据格式处理 - 直接使用后端返回的格式
-        if (result.data && Array.isArray(result.data)) {
-          // 转换数据格式
-          const transformedPosts = result.data.map((post: any) => ({
-            id: post.id,
-            content: post.content,
-            image_url: post.image_url,
-            created_at: post.created_at,
-            likes_count: post.likes_count || 0,
-            comments_count: post.comments_count || 0,
-            rewards_count: post.rewards_count || 0,
-            user: {
-              nickname: post.username || '用户',
-              avatar_url: undefined
-            },
-            location_data: post.location ? { name: `位置 (${post.location.latitude}, ${post.location.longitude})` } : undefined,
-            weather_data: post.weather ? { 
-              description: post.weather.weather || post.weather.description || '未知天气', 
-              temperature: post.weather.temperature || 0 
-            } : undefined
-          }));
-
-          // 过滤当前用户的帖子 - 匹配用户ID或email
-          const currentUserEmail = user?.email;
-          const userFilteredPosts = transformedPosts.filter((post: any) => {
-            const originalPost = result.data.find((p: any) => p.id === post.id);
-            return originalPost && originalPost.user_id;
-          });
-
-          setUserPosts(userFilteredPosts);
-          console.log(`✅ 成功获取 ${userFilteredPosts.length} 个用户帖子`);
-        } else {
-          // 如果API失败，使用模拟数据
-          console.warn('API返回格式异常，使用模拟数据');
-          setUserPosts(mockUserPosts);
-        }
-      } catch (error) {
-        console.error('获取用户帖子失败:', error);
-        // 使用模拟数据作为后备
-        setUserPosts(mockUserPosts);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // 模拟用户发布的内容（作为后备）
-    const mockUserPosts: Post[] = [
-      {
-        id: '1',
-        content: '今天阳光特别好，在阳台上晒了一下午的太阳，感觉整个人都被治愈了。简单的幸福就是这样，不需要多么复杂。',
-        image_url: '/placeholder-sunny.jpg',
-        created_at: '2024-12-13T14:00:00Z',
-        likes_count: 45,
-        comments_count: 8,
-        rewards_count: 5,
-        user: {
-          nickname: user?.email?.split('@')[0] || '用户',
-          avatar_url: user?.user_metadata?.avatar_url,
-        },
-        weather_data: {
-          description: '晴天',
-          temperature: 24,
-        },
-      },
-      {
-        id: '2',
-        content: '和朋友们一起去了新开的咖啡店，点了一杯拿铁，配上店里温暖的灯光，聊了很久很久。友谊真的是生活中最珍贵的财富。',
-        created_at: '2024-12-12T16:30:00Z',
-        likes_count: 67,
-        comments_count: 12,
-        rewards_count: 8,
-        user: {
-          nickname: user?.email?.split('@')[0] || '用户',
-          avatar_url: user?.user_metadata?.avatar_url,
-        },
-        location_data: {
-          name: '温馨咖啡屋',
-        },
-      },
-      {
-        id: '3',
-        content: '收到了远方朋友寄来的明信片，上面写着"想你了"三个字。虽然简单，但是比任何华丽的辞藻都要温暖。',
-        created_at: '2024-12-11T20:00:00Z',
-        likes_count: 89,
-        comments_count: 15,
-        rewards_count: 12,
-        user: {
-          nickname: user?.email?.split('@')[0] || '用户',
-          avatar_url: user?.user_metadata?.avatar_url,
-        },
-      },
-    ];
-
     fetchUserPosts();
   }, [user, isAuthenticated, authLoading, router]);
+
+  // 获取用户统计数据
+  const fetchUserStats = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      const response = await fetch('/api/users/stats', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setUserStats(result.data);
+        }
+      } else {
+        console.warn('获取用户统计失败，使用默认数据');
+        // 保持默认的模拟数据
+        setUserStats({
+          postsCount: 0,
+          likesReceived: 0,
+          rewardsReceived: 0,
+          commentsReceived: 0,
+        });
+      }
+    } catch (error) {
+      console.error('获取用户统计失败:', error);
+      // 保持默认的模拟数据
+      setUserStats({
+        postsCount: 0,
+        likesReceived: 0,
+        rewardsReceived: 0,
+        commentsReceived: 0,
+      });
+    }
+  };
+
+  // 获取用户帖子数据
+  const fetchUserPosts = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('access_token');
+      
+      if (!token) {
+        toast.error('登录已过期，请重新登录');
+        router.push('/login');
+        return;
+      }
+
+      // 获取所有帖子
+      const response = await fetch('/api/posts?page=1&limit=50&sort_type=latest');
+      const result = await response.json();
+      
+      // 修复数据格式处理 - 直接使用后端返回的格式
+      if (result.data && Array.isArray(result.data)) {
+        // 转换数据格式
+        const transformedPosts = result.data.map((post: any) => ({
+          id: post.id,
+          content: post.content,
+          image_url: post.image_url,
+          created_at: post.created_at,
+          likes_count: post.likes_count || 0,
+          comments_count: post.comments_count || 0,
+          rewards_count: post.rewards_count || 0,
+          user: {
+            nickname: post.username || '用户',
+            avatar_url: undefined
+          },
+          location_data: post.location ? { name: `位置 (${post.location.latitude}, ${post.location.longitude})` } : undefined,
+          weather_data: post.weather ? { 
+            description: post.weather.weather || post.weather.description || '未知天气', 
+            temperature: post.weather.temperature || 0 
+          } : undefined
+        }));
+
+        // 过滤当前用户的帖子 - 匹配用户ID
+        const userFilteredPosts = transformedPosts.filter((post: any) => {
+          const originalPost = result.data.find((p: any) => p.id === post.id);
+          return originalPost && originalPost.user_id === user?.id;
+        });
+
+        setUserPosts(userFilteredPosts);
+        console.log(`✅ 成功获取 ${userFilteredPosts.length} 个用户帖子`);
+      } else {
+        // 如果API失败，使用模拟数据
+        console.warn('API返回格式异常，使用模拟数据');
+        setUserPosts(mockUserPosts);
+      }
+    } catch (error) {
+      console.error('获取用户帖子失败:', error);
+      // 使用模拟数据作为后备
+      setUserPosts(mockUserPosts);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 退出登录
   const handleLogout = async () => {
@@ -414,15 +449,17 @@ export default function ProfilePage() {
             {activeTab === 'posts' && (
               <div className="space-y-6">
                 {userPosts.length > 0 ? (
-                  userPosts.map((post) => (
-                    <PostCard
-                      key={post.id}
-                      post={post}
-                      onLike={(postId) => console.log('点赞:', postId)}
-                      onComment={(postId) => console.log('评论:', postId)}
-                      onReward={(postId) => console.log('打赏:', postId)}
-                    />
-                  ))
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {userPosts.map((post) => (
+                      <PostCard
+                        key={post.id}
+                        post={post}
+                        onLike={(postId) => console.log('点赞:', postId)}
+                        onComment={(postId) => console.log('评论:', postId)}
+                        onReward={(postId) => console.log('打赏:', postId)}
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <div className="text-center py-12">
                     <div className="text-6xl mb-4">📝</div>
