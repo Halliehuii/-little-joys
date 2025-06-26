@@ -224,41 +224,64 @@ export default function HomePage() {
     }
 
     try {
-      // 使用API工具发送请求，自动处理认证
-      const { apiRequest } = await import('../lib/api')
+      // 使用AuthManager确保Token有效
+      const { AuthManager } = await import('../utils/auth')
+      const token = await AuthManager.ensureValidToken()
+      if (!token) {
+        // ensureValidToken已经处理了错误和跳转
+        return
+      }
+
+      // 创建FormData对象
+      const formData = new FormData()
+      formData.append('content', postData.content)
       
-      const response = await apiRequest.post('/api/posts', {
-        content: postData.content,
-        image_url: postData.image ? 'placeholder' : undefined, // 临时处理图片上传
-        location: postData.location ? {
-          latitude: 0,
-          longitude: 0,
-          address: postData.location
-        } : undefined,
-        weather: postData.weather ? {
-          temperature: 22,
-          description: postData.weather
-        } : undefined
+      if (postData.image) {
+        formData.append('image', postData.image)
+      }
+      
+      if (postData.location) {
+        formData.append('location', postData.location)
+      }
+      
+      if (postData.weather) {
+        formData.append('weather', postData.weather)
+      }
+
+      // 调用API创建帖子
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // 注意：不要设置Content-Type，让浏览器自动设置multipart/form-data
+        },
+        body: formData
       })
 
-      if (response.data) {
+      const result = await response.json()
+
+      if (!response.ok) {
+        // 如果是认证相关错误，使用AuthManager处理
+        if (response.status === 401) {
+          AuthManager.handleAuthError('登录已过期，请重新登录')
+          return
+        }
+        throw new Error(result.message || '发布失败')
+      }
+
+      if (result.success) {
         // 重新获取帖子列表以显示新内容
         await fetchPosts()
         setShowCreatePost(false)
         alert('发布成功！')
       } else {
-        throw new Error(response.message || '发布失败')
+        throw new Error(result.message || '发布失败')
       }
     } catch (error: any) {
       console.error('发布失败:', error)
       
-      // 如果是认证错误，不需要额外处理，API拦截器已经处理了
-      if (error.response?.status === 401) {
-        return // 让API拦截器处理认证失败
-      }
-      
-      // 其他错误显示具体信息
-      const errorMessage = error.response?.data?.message || error.message || '发布失败，请重试'
+      // 显示具体错误信息
+      const errorMessage = error.message || '发布失败，请重试'
       alert(errorMessage)
     }
   }
@@ -317,22 +340,38 @@ export default function HomePage() {
         )}
 
         {/* 便签列表 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="max-w-2xl mx-auto space-y-6">
           {loading ? (
             // 加载状态 - 显示3个占位符
             <>
               {[1, 2, 3].map((index) => (
-                <div key={index} className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl shadow-md animate-pulse flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin text-2xl mb-2">🌸</div>
-                    <p className="text-gray-500 text-sm">加载中...</p>
+                <div key={index} className="bg-white rounded-2xl shadow-lg p-6 animate-pulse">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-full"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  </div>
+                  <div className="mt-4 h-48 bg-gray-200 rounded-xl"></div>
+                  <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100">
+                    <div className="flex space-x-6">
+                      <div className="h-8 w-12 bg-gray-200 rounded-full"></div>
+                      <div className="h-8 w-12 bg-gray-200 rounded-full"></div>
+                      <div className="h-8 w-12 bg-gray-200 rounded-full"></div>
+                    </div>
+                    <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
                   </div>
                 </div>
               ))}
             </>
           ) : posts.length === 0 ? (
-            // 空状态 - 占据整个网格区域
-            <div className="col-span-1 md:col-span-2 lg:col-span-3 text-center py-20">
+            // 空状态
+            <div className="text-center py-20">
               <div className="text-6xl mb-4">📝</div>
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
                 还没有人分享小确幸
@@ -350,7 +389,7 @@ export default function HomePage() {
               )}
             </div>
           ) : (
-            // 便签列表 - 网格布局
+            // 便签列表 - 单列布局
             posts.map((post) => (
               <PostCard
                 key={post.id}

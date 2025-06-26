@@ -351,19 +351,30 @@ export default function UploadPage() {
         return;
       }
 
+      // 创建FormData对象
+      const formData = new FormData();
+      formData.append('content', content.trim());
+      
+      if (selectedImage) {
+        formData.append('image', selectedImage);
+      }
+      
+      if (location.trim()) {
+        formData.append('location', location.trim());
+      }
+      
+      if (weather.trim()) {
+        formData.append('weather', weather.trim());
+      }
+
       // 调用API创建帖子
       const response = await fetch('/api/posts', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
+          // 注意：不要设置Content-Type，让浏览器自动设置multipart/form-data
         },
-        body: JSON.stringify({
-          content: content.trim(),
-          image: selectedImage,
-          location: location.trim() || undefined,
-          weather: weather.trim() || undefined
-        })
+        body: formData
       });
 
       const result = await response.json();
