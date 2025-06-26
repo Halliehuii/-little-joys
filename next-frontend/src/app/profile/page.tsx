@@ -211,10 +211,11 @@ export default function ProfilePage() {
       const response = await fetch('/api/posts?page=1&limit=50&sort_type=latest');
       const result = await response.json();
       
+      console.log('posts', result)
       // 修复数据格式处理 - 直接使用后端返回的格式
-      if (result.data && Array.isArray(result.data)) {
+      if (result.data && Array.isArray(result.data.posts)) {
         // 转换数据格式
-        const transformedPosts = result.data.map((post: any) => ({
+        const transformedPosts = result.data.posts.map((post: any) => ({
           id: post.id,
           content: post.content,
           image_url: post.image_url,
@@ -235,7 +236,7 @@ export default function ProfilePage() {
 
         // 过滤当前用户的帖子 - 匹配用户ID
         const userFilteredPosts = transformedPosts.filter((post: any) => {
-          const originalPost = result.data.find((p: any) => p.id === post.id);
+          const originalPost = result.data.posts.find((p: any) => p.id === post.id);
           return originalPost && originalPost.user_id === user?.id;
         });
 

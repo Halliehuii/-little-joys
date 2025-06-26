@@ -7,6 +7,13 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from auth import jwt_handler
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # HTTP Bearer认证方案
 security = HTTPBearer()
@@ -34,6 +41,10 @@ async def get_current_user_id(
     try:
         # 提取Bearer Token（去掉"Bearer "前缀）
         token = credentials.credentials
+
+        logging.info('--------------------------------')
+
+        logging.info(f'token: {token}')
         
         # 验证Token并提取用户ID
         user_id = jwt_handler.extract_user_id(token)

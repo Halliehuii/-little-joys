@@ -76,9 +76,8 @@ print(f"   ENVIRONMENT: {ENVIRONMENT}")
 # ================================
 
 # 配置日志级别
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO" if ENVIRONMENT == "production" else "DEBUG")
 logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
+    level=getattr(logging, "INFO"),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -203,6 +202,7 @@ class PostCreate(BaseModel):
     audio_url: Optional[str] = None
     location_data: Optional[Dict[str, Any]] = None
     weather_data: Optional[Dict[str, Any]] = None
+    user_id: str = Field(..., min_length=1)
 
 class CommentCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=200)
@@ -454,12 +454,12 @@ async def update_user_profile(
 @app.post("/api/v1/posts")
 async def create_post(
     post_data: PostCreate,
-    current_user_id: str = Depends(get_current_user_id)
+    # current_user_id: str = Depends(get_current_user_id)
 ):
     """创建新便签"""
     try:
         insert_data = {
-            'user_id': current_user_id,
+            'user_id': post_data.user_id,
             'content': post_data.content,
             'image_url': post_data.image_url,
             'audio_url': post_data.audio_url,
@@ -490,13 +490,11 @@ async def get_posts_list(
     """获取便签列表"""
     try:
         offset = (page - 1) * limit
+
         
+        # 第一步：查询便签数据（不包含用户信息）
         query = supabase.table('posts').select(
-            '''
-            id, content, image_url, audio_url, location_data, weather_data,
-            likes_count, comments_count, rewards_count, rewards_amount, created_at,
-            user_profiles!posts_user_id_fkey(nickname, avatar_url)
-            '''
+            'id, content, image_url, audio_url, location_data, weather_data, likes_count, comments_count, rewards_count, rewards_amount, created_at, user_id'
         ).eq('is_deleted', False)
         
         if user_id:
@@ -507,7 +505,33 @@ async def get_posts_list(
         else:
             query = query.order('created_at', desc=True)
         
-        response = query.range(offset, offset + limit - 1).execute()
+        posts_response = query.range(offset, offset + limit - 1).execute()
+        posts_data = posts_response.data
+        
+        # 第二步：获取所有相关用户的ID
+        user_ids = list(set([post['user_id'] for post in posts_data]))
+        
+        # 第三步：批量查询用户信息
+        users_data = {}
+        if user_ids:
+            users_response = supabase.table('user_profiles').select(
+                'id, nickname, avatar_url'
+            ).in_('id', user_ids).execute()
+            
+            # 将用户数据转换为字典，方便查找
+            for user in users_response.data:
+                users_data[user['id']] = {
+                    'nickname': user['nickname'],
+                    'avatar_url': user['avatar_url']
+                }
+        
+        # 第四步：组合数据
+        for post in posts_data:
+            user_info = users_data.get(post['user_id'], {
+                'nickname': '未知用户',
+                'avatar_url': None
+            })
+            post['user_profiles'] = user_info
         
         # 获取总数
         count_query = supabase.table('posts').select('id', count='exact').eq('is_deleted', False)
@@ -518,7 +542,7 @@ async def get_posts_list(
         return {
             "success": True,
             "data": {
-                "posts": response.data,
+                "posts": posts_data,
                 "pagination": {
                     "page": page,
                     "limit": limit,
@@ -535,15 +559,29 @@ async def get_posts_list(
 async def get_post_detail(post_id: str, current_user_id: Optional[str] = Depends(get_current_user_id)):
     """获取便签详情"""
     try:
-        response = supabase.table('posts').select(
-            '''
-            id, content, image_url, audio_url, location_data, weather_data,
-            likes_count, comments_count, rewards_count, rewards_amount, created_at,
-            user_profiles!posts_user_id_fkey(nickname, avatar_url)
-            '''
+        # 第一步：查询便签数据
+        posts_response = supabase.table('posts').select(
+            'id, content, image_url, audio_url, location_data, weather_data, likes_count, comments_count, rewards_count, rewards_amount, created_at, user_id'
         ).eq('id', post_id).eq('is_deleted', False).single().execute()
         
-        post_data = response.data
+        post_data = posts_response.data
+        
+        # 第二步：查询用户信息
+        try:
+            user_response = supabase.table('user_profiles').select(
+                'id, nickname, avatar_url'
+            ).eq('id', post_data['user_id']).single().execute()
+            
+            post_data['user_profiles'] = {
+                'nickname': user_response.data['nickname'],
+                'avatar_url': user_response.data['avatar_url']
+            }
+        except:
+            # 如果用户信息不存在，使用默认值
+            post_data['user_profiles'] = {
+                'nickname': '未知用户',
+                'avatar_url': None
+            }
         
         # 检查当前用户是否已点赞
         is_liked = False
@@ -559,7 +597,7 @@ async def get_post_detail(post_id: str, current_user_id: Optional[str] = Depends
             "message": "便签详情获取成功"
         }
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"便签不存在或已删除")
+        raise HTTPException(status_code=404, detail=f"便签不存在或已删除: {str(e)}")
 
 @app.delete("/api/v1/posts/{post_id}")
 async def delete_post(post_id: str, current_user_id: str = Depends(get_current_user_id)):
@@ -661,12 +699,37 @@ async def get_comments_list(post_id: str, page: int = 1, limit: int = 10):
     try:
         offset = (page - 1) * limit
         
-        response = supabase.table('comments').select(
-            '''
-            id, content, created_at,
-            user_profiles!comments_user_id_fkey(nickname, avatar_url)
-            '''
+        # 第一步：查询评论数据
+        comments_response = supabase.table('comments').select(
+            'id, content, created_at, user_id'
         ).eq('post_id', post_id).eq('is_deleted', False).order('created_at', desc=False).range(offset, offset + limit - 1).execute()
+        
+        comments_data = comments_response.data
+        
+        # 第二步：获取所有相关用户的ID
+        user_ids = list(set([comment['user_id'] for comment in comments_data]))
+        
+        # 第三步：批量查询用户信息
+        users_data = {}
+        if user_ids:
+            users_response = supabase.table('user_profiles').select(
+                'id, nickname, avatar_url'
+            ).in_('id', user_ids).execute()
+            
+            # 将用户数据转换为字典，方便查找
+            for user in users_response.data:
+                users_data[user['id']] = {
+                    'nickname': user['nickname'],
+                    'avatar_url': user['avatar_url']
+                }
+        
+        # 第四步：组合数据
+        for comment in comments_data:
+            user_info = users_data.get(comment['user_id'], {
+                'nickname': '未知用户',
+                'avatar_url': None
+            })
+            comment['user_profiles'] = user_info
         
         # 获取总数
         total_count = supabase.table('comments').select('id', count='exact').eq('post_id', post_id).eq('is_deleted', False).execute().count
@@ -674,7 +737,7 @@ async def get_comments_list(post_id: str, page: int = 1, limit: int = 10):
         return {
             "success": True,
             "data": {
-                "comments": response.data,
+                "comments": comments_data,
                 "pagination": {
                     "page": page,
                     "limit": limit,

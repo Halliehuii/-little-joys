@@ -4,27 +4,28 @@ import toast from 'react-hot-toast'
 
 // 获取API基础URL
 const getApiBaseUrl = () => {
-  // 优先使用环境变量中的API URL
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL
-  }
+  return ''
+  // // 优先使用环境变量中的API URL
+  // if (process.env.NEXT_PUBLIC_API_URL) {
+  //   return process.env.NEXT_PUBLIC_API_URL
+  // }
   
-  // 根据环境自动检测
-  if (typeof window !== 'undefined') {
-    // 客户端环境
-    const hostname = window.location.hostname
+  // // 根据环境自动检测
+  // if (typeof window !== 'undefined') {
+  //   // 客户端环境
+  //   const hostname = window.location.hostname
     
-    if (hostname === 'littlejoys.xyz' || hostname === 'www.littlejoys.xyz') {
-      // 生产环境
-      return 'https://api.littlejoys.xyz'
-    } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // 本地开发环境
-      return 'http://localhost:8000'
-    }
-  }
+  //   if (hostname === 'littlejoys.xyz' || hostname === 'www.littlejoys.xyz') {
+  //     // 生产环境
+  //     return 'https://api.littlejoys.xyz'
+  //   } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+  //     // 本地开发环境
+  //     return 'http://localhost:8000'
+  //   }
+  // }
   
-  // 默认回退到本地开发环境
-  return 'http://localhost:8000'
+  // // 默认回退到本地开发环境
+  // return 'http://localhost:8000'
 }
 
 // 创建axios实例
@@ -43,19 +44,30 @@ if (process.env.NODE_ENV === 'development') {
 
 // 请求拦截器 - 自动添加JWT Token到请求头
 api.interceptors.request.use(
-  async (config) => {
+  (config) => {
     try {
       // 获取当前用户的JWT Token
-      const token = await getCurrentUserToken()
+      const token = getCurrentUserToken()
       
       if (token) {
         // 在请求头中添加Authorization字段
         config.headers.Authorization = `Bearer ${token}`
+        
+        // 开发环境下记录Token信息
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🔐 添加Token到请求头: ${token.substring(0, 20)}...`)
+        }
+      } else {
+        // 开发环境下记录没有Token的情况
+        if (process.env.NODE_ENV === 'development') {
+          console.log('⚠️ 没有找到有效的Token')
+        }
       }
       
       // 开发环境下记录请求信息
       if (process.env.NODE_ENV === 'development') {
         console.log(`🚀 API请求: ${config.method?.toUpperCase()} ${config.url}`)
+        console.log(`🔗 请求头Authorization: ${config.headers.Authorization ? '已设置' : '未设置'}`)
       }
     } catch (error) {
       console.error('获取Token失败:', error)

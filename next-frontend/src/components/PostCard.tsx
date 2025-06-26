@@ -67,7 +67,7 @@ const PostCard = ({ post, onLike, onComment, onReward }: PostCardProps) => {
   };
 
   return (
-    <div className={`bg-gradient-to-br ${getBackgroundGradient()} rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-opacity-20 border-gray-300 aspect-square flex flex-col justify-between relative group hover:scale-105`}>
+    <div className={`bg-gradient-to-br h-full ${getBackgroundGradient()} rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-opacity-20 border-gray-300 aspect-square flex flex-col justify-between relative group hover:scale-105`}>
       
       {/* 用户信息 - 顶部 */}
       <div className="flex items-center justify-between mb-3">

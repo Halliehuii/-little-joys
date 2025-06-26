@@ -23,6 +23,8 @@ export default function UploadPage() {
   // 自动获取位置
   const [locationLoading, setLocationLoading] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [locationStatus, setLocationStatus] = useState('');
+  const [weatherStatus, setWeatherStatus] = useState('');
 
   // 使用Zustand store获取认证状态
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -95,6 +97,7 @@ export default function UploadPage() {
   // 获取位置
   const handleGetLocation = async () => {
     setLocationLoading(true);
+    setLocationStatus('正在获取位置...');
     
     try {
       if (!navigator.geolocation) {
@@ -120,7 +123,10 @@ export default function UploadPage() {
       
       if (data.success) {
         setLocation(data.address);
-        toast.success(`📍 定位成功！获取到地址：${data.address}`);
+        setLocationStatus('✅ 定位成功');
+        console.log(`📍 定位成功！获取到地址：${data.address}`);
+        // 3秒后清除状态提示
+        setTimeout(() => setLocationStatus(''), 3000);
       } else {
         throw new Error(data.error || '地址解析失败');
       }
@@ -147,8 +153,11 @@ export default function UploadPage() {
         errorMessage = error.message;
       }
       
-      toast.error(`${errorMessage}，请手动输入位置信息`);
+      console.error(`${errorMessage}，请手动输入位置信息`);
       setLocation('请手动输入位置');
+      setLocationStatus(`❌ ${errorMessage}`);
+      // 5秒后清除状态提示
+      setTimeout(() => setLocationStatus(''), 5000);
     } finally {
       setLocationLoading(false);
     }
@@ -157,6 +166,7 @@ export default function UploadPage() {
   // 获取天气
   const handleGetWeather = async () => {
     setWeatherLoading(true);
+    setWeatherStatus('正在获取天气...');
     
     try {
       if (!navigator.geolocation) {
@@ -182,7 +192,10 @@ export default function UploadPage() {
       
       if (data.success) {
         setWeather(data.weather);
-        toast.success(`🌤️ 天气获取成功！${data.details.location}：${data.weather}`);
+        setWeatherStatus('✅ 天气获取成功');
+        console.log(`🌤️ 天气获取成功！${data.details.location}：${data.weather}`);
+        // 3秒后清除状态提示
+        setTimeout(() => setWeatherStatus(''), 3000);
       } else {
         throw new Error(data.error || '天气解析失败');
       }
@@ -209,8 +222,11 @@ export default function UploadPage() {
         errorMessage = error.message;
       }
       
-      toast.error(`${errorMessage}，请手动输入天气信息`);
+      console.error(`${errorMessage}，请手动输入天气信息`);
       setWeather('请手动输入天气');
+      setWeatherStatus(`❌ ${errorMessage}`);
+      // 5秒后清除状态提示
+      setTimeout(() => setWeatherStatus(''), 5000);
     } finally {
       setWeatherLoading(false);
     }
@@ -565,7 +581,7 @@ export default function UploadPage() {
                       {locationLoading ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
-                          <span>获取中...</span>
+                          <span>{locationStatus}</span>
                         </>
                       ) : (
                         <>
@@ -606,6 +622,12 @@ export default function UploadPage() {
                   <div className="text-xs text-gray-500">
                     💡 提示：点击"自动定位"获取大致位置，或手动输入具体地址
                   </div>
+                  {/* 地点状态提示 */}
+                  {locationStatus && (
+                    <div className={`text-xs mt-1 ${locationStatus.includes('❌') ? 'text-red-600' : 'text-green-600'}`}>
+                      {locationStatus}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -637,7 +659,7 @@ export default function UploadPage() {
                       {weatherLoading ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-600 border-t-transparent"></div>
-                          <span>获取中...</span>
+                          <span>{weatherStatus}</span>
                         </>
                       ) : (
                         <>
@@ -647,6 +669,12 @@ export default function UploadPage() {
                       )}
                     </button>
                   </div>
+                  {/* 天气状态提示 */}
+                  {weatherStatus && (
+                    <div className={`text-xs ${weatherStatus.includes('❌') ? 'text-red-600' : 'text-green-600'}`}>
+                      {weatherStatus}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

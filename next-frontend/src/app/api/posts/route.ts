@@ -10,7 +10,7 @@ const getApiBaseUrl = () => {
   if (process.env.NODE_ENV === 'development') {
     return process.env.BACKEND_URL || 'http://localhost:8000'
   }
-  
+
   // 在生产环境中使用生产环境API URL
   return process.env.BACKEND_URL || 'https://api.littlejoys.xyz'
 }
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json()
-    
+
     return NextResponse.json({
       success: true,
       data: data.data,
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('获取帖子列表失败:', error)
-    
+
     return NextResponse.json({
       success: false,
       message: error instanceof Error ? error.message : '获取帖子列表失败'
@@ -108,11 +108,11 @@ async function uploadImageToStorage(imageFile: File, userId: string): Promise<st
 // POST - 创建新帖子
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData()
-    const content = formData.get('content') as string
-    const image = formData.get('image') as File | null
-    const location = formData.get('location') as string | null
-    const weather = formData.get('weather') as string | null
+    const { content, image, location, weather } = await request.json()
+    // const content = formData.get('content') as string
+    // const image = formData.get('image') as File | null
+    // const location = formData.get('location') as string | null
+    // const weather = formData.get('weather') as string | null
 
     // 验证必需字段
     if (!content || !content.trim()) {
@@ -183,6 +183,7 @@ export async function POST(request: NextRequest) {
 
     // 准备发送到后端的数据
     const postData = {
+      user_id: user.id,
       content: content.trim(),
       image_url: imageUrl,
       location_data: location ? { name: location } : null,
@@ -206,7 +207,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await response.json()
-    
+
     return NextResponse.json({
       success: true,
       data: result.data,
@@ -215,7 +216,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('创建帖子失败:', error)
-    
+
     return NextResponse.json({
       success: false,
       message: error instanceof Error ? error.message : '创建帖子失败'

@@ -9,9 +9,19 @@ from datetime import datetime
 from fastapi import HTTPException, status
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 
 # 加载环境变量
 load_dotenv()
+
+
 
 # 从环境变量获取JWT密钥
 JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
@@ -95,6 +105,8 @@ class JWTHandler:
             HTTPException: Token无效或不包含用户ID时抛出异常
         """
         payload = JWTHandler.verify_token(token)
+
+        logging.info(f'payload: {payload}')
         
         # 从载荷中提取用户ID
         # Supabase JWT中用户ID通常在'sub'字段中

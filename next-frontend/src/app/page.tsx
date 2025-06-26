@@ -39,21 +39,21 @@ export default function HomePage() {
       setLoading(true)
       console.log('📡 发送API请求到: /api/posts')
       
-      const response = await fetch('/api/posts?page=1&limit=20&sort_type=latest')
-      console.log('📥 收到响应，状态:', response.status)
+      // 直接调用FastAPI后端
+      const { apiRequest } = await import('../lib/api')
+      const result = await apiRequest.get('/api/posts', {
+        page: 1,
+        limit: 20,
+        sort_type: 'latest'
+      })
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      const result = await response.json()
       console.log('📋 API响应数据:', result)
       
       // 检查数据格式
-      if (result.data && Array.isArray(result.data)) {
+      if (result.data && Array.isArray(result.data.posts)) {
         console.log('✅ 数据格式正确，开始转换...')
         // 简化数据转换
-        const transformedPosts = result.data.map((post: any) => ({
+        const transformedPosts = result.data.posts.map((post: any) => ({
           id: post.id,
           content: post.content,
           image_url: post.image_url,
@@ -77,100 +77,16 @@ export default function HomePage() {
         console.log(`✅ 成功设置 ${transformedPosts.length} 个帖子`)
       } else {
         console.warn('⚠️ API返回数据格式异常:', result)
-        console.log('🔄 使用模拟数据')
-        setPosts(mockPosts)
+        setPosts([])
       }
     } catch (error) {
       console.error('❌ 获取帖子失败:', error)
-      console.log('🔄 使用模拟数据')
-      setPosts(mockPosts)
+      setPosts([])
     } finally {
       console.log('🏁 设置loading为false')
       setLoading(false)
     }
   }
-
-  // 模拟数据（作为后备）
-  const mockPosts: Post[] = [
-    {
-      id: '1',
-      content: '生活就像这块⭐芝士吐司。',
-      image_url: '/placeholder-toast.jpg',
-      created_at: '2024-12-13T20:00:00Z',
-      likes_count: 42,
-      comments_count: 8,
-      rewards_count: 3,
-      user: {
-        nickname: 'Sloppy_Girl',
-        avatar_url: undefined,
-      },
-      location_data: {
-        name: '橙黄色灯光',
-      },
-      weather_data: {
-        description: '晴',
-        temperature: 22,
-      },
-    },
-    {
-      id: '2',
-      content: '今天中午吃饭去其他档口买红豆汤，我说我想要多一点丸子，阿姨努力的首了两丸子！阿姨真好丸子真好多！喝红豆汤真好。',
-      created_at: '2024-12-13T19:30:00Z',
-      likes_count: 35,
-      comments_count: 12,
-      rewards_count: 5,
-      user: {
-        nickname: '小确幸收集者',
-        avatar_url: undefined,
-      },
-      location_data: {
-        name: '学校食堂',
-      },
-    },
-    {
-      id: '3',
-      content: '卜卜分享了她今天的星巴克口令"期待新的故事发生"，我接了句也想偶她就立刻给我点了，在这一刻我隔空享了一样的焦糖咖啡和可爱口令，真想卜卜啊！',
-      created_at: '2024-12-13T18:45:00Z',
-      likes_count: 67,
-      comments_count: 15,
-      rewards_count: 8,
-      user: {
-        nickname: '远方朋友',
-        avatar_url: undefined,
-      },
-    },
-    {
-      id: '4',
-      content: '下班时在地铁口看到了久违的蛋卷大叔，10元立刻拿下一包，他今天的鼻子被风吹的红红的。',
-      created_at: '2025-01-10T20:00:00Z',
-      likes_count: 28,
-      comments_count: 6,
-      rewards_count: 2,
-      user: {
-        nickname: '地铁通勤者',
-        avatar_url: undefined,
-      },
-      location_data: {
-        name: '地铁站',
-      },
-    },
-    {
-      id: '5',
-      content: '坐在沙发上看火线，外面的天慢慢暗下去，空调从左边吹来热热的，阿斯在左边睡的微微张开，缩缩在左边睡的头垂着的，我也容易欲睡。',
-      created_at: '2025-01-20T20:00:00Z',
-      likes_count: 43,
-      comments_count: 9,
-      rewards_count: 4,
-      user: {
-        nickname: '懒懒下午',
-        avatar_url: undefined,
-      },
-      weather_data: {
-        description: '阴天',
-        temperature: 18,
-      },
-    },
-  ]
 
   useEffect(() => {
     // 检查登录状态
@@ -289,35 +205,11 @@ export default function HomePage() {
               <span className="font-medium">写一件幸福小事</span>
             </button>
             
-            {/* 开发环境下的调试按钮 */}
-            {process.env.NODE_ENV === 'development' && (
-              <>
-                <button
-                  onClick={async () => {
-                    const { debugAuthState } = await import('../lib/auth')
-                    const state = debugAuthState()
-                    alert(`认证状态:\n- 有Token: ${state.hasToken}\n- Token有效: ${state.tokenValid}\n- 已认证: ${state.isAuthenticated}\n\n详细信息请查看控制台`)
-                  }}
-                  className="mt-2 text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-300 mr-2"
-                >
-                  🔍 调试认证状态
-                </button>
-                <button
-                  onClick={() => {
-                    console.log('🔄 手动触发数据获取')
-                    fetchPosts()
-                  }}
-                  className="mt-2 text-xs bg-blue-200 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-300"
-                >
-                  🔄 重新获取数据
-                </button>
-              </>
-            )}
           </div>
         )}
 
         {/* 便签列表 */}
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-2xl mx-auto grid grid-cols-3 gap-4">
           {loading ? (
             // 加载状态 - 显示3个占位符
             <>

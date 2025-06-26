@@ -26,6 +26,9 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
   const [locationLoading, setLocationLoading] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
   
+  const [locationStatus, setLocationStatus] = useState(''); // 新增地点状态提示
+  const [weatherStatus, setWeatherStatus] = useState(''); // 新增天气状态提示
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -68,6 +71,7 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
   // 自动获取位置 - 使用真实API
   const handleGetLocation = async () => {
     setLocationLoading(true);
+    setLocationStatus('正在获取位置...');
     
     try {
       if (!navigator.geolocation) {
@@ -97,7 +101,10 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
       
       if (data.success) {
         setLocation(data.address);
-        alert(`📍 定位成功！获取到地址：${data.address}`);
+        setLocationStatus('✅ 定位成功');
+        console.log(`📍 定位成功！获取到地址：${data.address}`);
+        // 3秒后清除状态提示
+        setTimeout(() => setLocationStatus(''), 3000);
       } else {
         throw new Error(data.error || '地址解析失败');
       }
@@ -124,8 +131,11 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
         errorMessage = error.message;
       }
       
-      alert(`${errorMessage}，请手动输入位置信息`);
+      console.error(`${errorMessage}，请手动输入位置信息`);
       setLocation('请手动输入位置');
+      setLocationStatus(`❌ ${errorMessage}`);
+      // 5秒后清除状态提示
+      setTimeout(() => setLocationStatus(''), 5000);
     } finally {
       setLocationLoading(false);
     }
@@ -134,6 +144,7 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
   // 自动获取天气 - 使用真实API
   const handleGetWeather = async () => {
     setWeatherLoading(true);
+    setWeatherStatus('正在获取天气...');
     
     try {
       if (!navigator.geolocation) {
@@ -163,7 +174,10 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
       
       if (data.success) {
         setWeather(data.weather);
-        alert(`🌤️ 天气获取成功！${data.details.location}：${data.weather}`);
+        setWeatherStatus('✅ 天气获取成功');
+        console.log(`🌤️ 天气获取成功！${data.details.location}：${data.weather}`);
+        // 3秒后清除状态提示
+        setTimeout(() => setWeatherStatus(''), 3000);
       } else {
         throw new Error(data.error || '天气解析失败');
       }
@@ -190,8 +204,11 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
         errorMessage = error.message;
       }
       
-      alert(`${errorMessage}，请手动输入天气信息`);
+      console.error(`${errorMessage}，请手动输入天气信息`);
       setWeather('请手动输入天气');
+      setWeatherStatus(`❌ ${errorMessage}`);
+      // 5秒后清除状态提示
+      setTimeout(() => setWeatherStatus(''), 5000);
     } finally {
       setWeatherLoading(false);
     }
@@ -364,6 +381,12 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
                   )}
                 </button>
               </div>
+              {/* 地点状态提示 */}
+              {locationStatus && (
+                <div className={`text-xs mt-1 ${locationStatus.includes('❌') ? 'text-red-600' : 'text-green-600'}`}>
+                  {locationStatus}
+                </div>
+              )}
             </div>
 
             {/* 天气 */}
@@ -393,6 +416,12 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
                   )}
                 </button>
               </div>
+              {/* 天气状态提示 */}
+              {weatherStatus && (
+                <div className={`text-xs mt-1 ${weatherStatus.includes('❌') ? 'text-red-600' : 'text-green-600'}`}>
+                  {weatherStatus}
+                </div>
+              )}
             </div>
           </div>
 
