@@ -224,64 +224,41 @@ export default function HomePage() {
     }
 
     try {
-      // 使用AuthManager确保Token有效
-      const { AuthManager } = await import('../utils/auth')
-      const token = await AuthManager.ensureValidToken()
-      if (!token) {
-        // ensureValidToken已经处理了错误和跳转
-        return
-      }
-
-      // 创建FormData对象
-      const formData = new FormData()
-      formData.append('content', postData.content)
+      // 使用API工具发送请求，自动处理认证
+      const { apiRequest } = await import('../lib/api')
       
-      if (postData.image) {
-        formData.append('image', postData.image)
-      }
-      
-      if (postData.location) {
-        formData.append('location', postData.location)
-      }
-      
-      if (postData.weather) {
-        formData.append('weather', postData.weather)
-      }
-
-      // 调用API创建帖子
-      const response = await fetch('/api/posts', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-          // 注意：不要设置Content-Type，让浏览器自动设置multipart/form-data
-        },
-        body: formData
+      const response = await apiRequest.post('/api/posts', {
+        content: postData.content,
+        image_url: postData.image ? 'placeholder' : undefined, // 临时处理图片上传
+        location: postData.location ? {
+          latitude: 0,
+          longitude: 0,
+          address: postData.location
+        } : undefined,
+        weather: postData.weather ? {
+          temperature: 22,
+          description: postData.weather
+        } : undefined
       })
 
-      const result = await response.json()
-
-      if (!response.ok) {
-        // 如果是认证相关错误，使用AuthManager处理
-        if (response.status === 401) {
-          AuthManager.handleAuthError('登录已过期，请重新登录')
-          return
-        }
-        throw new Error(result.message || '发布失败')
-      }
-
-      if (result.success) {
+      if (response.data) {
         // 重新获取帖子列表以显示新内容
         await fetchPosts()
         setShowCreatePost(false)
         alert('发布成功！')
       } else {
-        throw new Error(result.message || '发布失败')
+        throw new Error(response.message || '发布失败')
       }
     } catch (error: any) {
       console.error('发布失败:', error)
       
-      // 显示具体错误信息
-      const errorMessage = error.message || '发布失败，请重试'
+      // 如果是认证错误，不需要额外处理，API拦截器已经处理了
+      if (error.response?.status === 401) {
+        return // 让API拦截器处理认证失败
+      }
+      
+      // 其他错误显示具体信息
+      const errorMessage = error.response?.data?.message || error.message || '发布失败，请重试'
       alert(errorMessage)
     }
   }
