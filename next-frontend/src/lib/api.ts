@@ -4,28 +4,12 @@ import toast from 'react-hot-toast'
 
 // 获取API基础URL
 const getApiBaseUrl = () => {
-  return ''
-  // // 优先使用环境变量中的API URL
-  // if (process.env.NEXT_PUBLIC_API_URL) {
-  //   return process.env.NEXT_PUBLIC_API_URL
-  // }
-  
-  // // 根据环境自动检测
-  // if (typeof window !== 'undefined') {
-  //   // 客户端环境
-  //   const hostname = window.location.hostname
-    
-  //   if (hostname === 'littlejoys.xyz' || hostname === 'www.littlejoys.xyz') {
-  //     // 生产环境
-  //     return 'https://api.littlejoys.xyz'
-  //   } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
-  //     // 本地开发环境
-  //     return 'http://localhost:8000'
-  //   }
-  // }
-  
-  // // 默认回退到本地开发环境
-  // return 'http://localhost:8000'
+  // 开发环境使用本地地址，生产环境使用线上地址
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:8000'
+  } else {
+    return 'https://api.littlejoys.xyz'
+  }
 }
 
 // 创建axios实例
