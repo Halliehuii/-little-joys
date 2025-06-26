@@ -5,11 +5,12 @@ import toast from 'react-hot-toast'
 // 获取API基础URL
 const getApiBaseUrl = () => {
   // 开发环境使用本地地址，生产环境使用线上地址
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:8000'
-  } else {
-    return 'https://api.littlejoys.xyz'
-  }
+  // if (process.env.NODE_ENV === 'development') {
+  //   return 'http://localhost:8000'
+  // } else {
+  //   return 'https://api.littlejoys.xyz'
+  // }
+  return ''
 }
 
 // 创建axios实例
