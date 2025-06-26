@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>发布功能调试工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        
+        textarea, input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 发布功能调试工具</h1>
+    
+    <!-- 系统状态检查 -->
+    <div class="container">
+        <h2>📊 系统状态检查</h2>
+        <button onclick="checkSystemStatus()">检查系统状态</button>
+        <div id="systemStatus"></div>
+    </div>
+    
+    <!-- 认证状态检查 -->
+    <div class="container">
+        <h2>🔐 认证状态检查</h2>
+        <button onclick="checkAuthStatus()">检查认证状态</button>
+        <div id="authStatus"></div>
+        
+        <h3>快速登录测试</h3>
+        <input type="email" id="email" placeholder="邮箱" value="test@example.com">
+        <input type="password" id="password" placeholder="密码" value="password123">
+        <button onclick="testLogin()">测试登录</button>
+    </div>
+    
+    <!-- API连接测试 -->
+    <div class="container">
+        <h2>🌐 API连接测试</h2>
+        <button onclick="testApiConnection()">测试API连接</button>
+        <div id="apiStatus"></div>
+    </div>
+    
+    <!-- 发布功能测试 -->
+    <div class="container">
+        <h2>📝 发布功能测试</h2>
+        <textarea id="testContent" placeholder="输入测试内容..." rows="3">今天天气很好，心情也很好！这是一个测试发布。</textarea>
+        <button onclick="testPublish()">测试发布</button>
+        <div id="publishStatus"></div>
+    </div>
+    
+    <!-- 调试日志 -->
+    <div class="container">
+        <h2>📋 调试日志</h2>
+        <button onclick="clearLog()">清空日志</button>
+        <div id="debugLog" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://api.littlejoys.xyz';
+        const LOCAL_API_URL = 'http://localhost:8000';
+        
+        // 日志函数
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logDiv.textContent += logEntry;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(logEntry);
+        }
+        
+        function clearLog() {
+            document.getElementById('debugLog').textContent = '';
+        }
+        
+        // 显示状态
+        function showStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        // 检查系统状态
+        async function checkSystemStatus() {
+            log('开始检查系统状态...');
+            
+            const checks = [
+                { name: 'localStorage支持', test: () => typeof(Storage) !== "undefined" },
+                { name: 'fetch API支持', test: () => typeof(fetch) !== "undefined" },
+                { name: '本地存储的Token', test: () => localStorage.getItem('access_token') !== null }
+            ];
+            
+            let statusHtml = '<h3>系统检查结果：</h3>';
+            
+            checks.forEach(check => {
+                const result = check.test();
+                const icon = result ? '✅' : '❌';
+                const status = result ? 'success' : 'error';
+                statusHtml += `<div class="status ${status}">${icon} ${check.name}: ${result ? '正常' : '异常'}</div>`;
+                log(`${check.name}: ${result ? '正常' : '异常'}`);
+            });
+            
+            // 检查存储的Token详情
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                statusHtml += `<div class="status info">📝 Token长度: ${token.length} 字符</div>`;
+                statusHtml += `<div class="status info">🔤 Token开头: ${token.substring(0, 20)}...</div>`;
+                log(`找到Token，长度: ${token.length}`);
+            } else {
+                statusHtml += `<div class="status warning">⚠️ 未找到存储的认证Token</div>`;
+                log('未找到认证Token');
+            }
+            
+            showStatus('systemStatus', statusHtml);
+        }
+        
+        // 检查认证状态
+        async function checkAuthStatus() {
+            log('开始检查认证状态...');
+            
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                showStatus('authStatus', '<div class="status error">❌ 未找到认证Token，请先登录</div>');
+                log('认证检查失败: 未找到Token');
+                return;
+            }
+            
+            try {
+                // 测试认证API
+                const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                log(`认证API响应状态: ${response.status}`);
+                log(`认证API响应数据: ${JSON.stringify(data, null, 2)}`);
+                
+                if (response.ok) {
+                    showStatus('authStatus', `
+                        <div class="status success">✅ 认证状态正常</div>
+                        <div class="status info">👤 用户ID: ${data.data?.user_id || '未知'}</div>
+                        <div class="status info">📧 用户信息: ${JSON.stringify(data.data?.profile || {}, null, 2)}</div>
+                    `);
+                } else {
+                    showStatus('authStatus', `<div class="status error">❌ 认证失败: ${data.message || response.statusText}</div>`);
+                }
+            } catch (error) {
+                log(`认证检查错误: ${error.message}`);
+                showStatus('authStatus', `<div class="status error">❌ 认证检查失败: ${error.message}</div>`);
+            }
+        }
+        
+        // 测试API连接
+        async function testApiConnection() {
+            log('开始测试API连接...');
+            
+            const urls = [
+                { name: '生产API', url: API_BASE_URL },
+                { name: '本地API', url: LOCAL_API_URL }
+            ];
+            
+            let statusHtml = '<h3>API连接测试结果：</h3>';
+            
+            for (const apiUrl of urls) {
+                try {
+                    log(`测试连接: ${apiUrl.url}`);
+                    const startTime = Date.now();
+                    const response = await fetch(`${apiUrl.url}/health`, {
+                        method: 'GET',
+                        timeout: 5000
+                    });
+                    const endTime = Date.now();
+                    const responseTime = endTime - startTime;
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        statusHtml += `<div class="status success">✅ ${apiUrl.name} (${apiUrl.url}): 连接正常 (${responseTime}ms)</div>`;
+                        log(`${apiUrl.name} 连接成功，响应时间: ${responseTime}ms`);
+                    } else {
+                        statusHtml += `<div class="status error">❌ ${apiUrl.name}: HTTP ${response.status} ${response.statusText}</div>`;
+                        log(`${apiUrl.name} 连接失败: ${response.status}`);
+                    }
+                } catch (error) {
+                    statusHtml += `<div class="status error">❌ ${apiUrl.name}: 连接失败 - ${error.message}</div>`;
+                    log(`${apiUrl.name} 连接错误: ${error.message}`);
+                }
+            }
+            
+            showStatus('apiStatus', statusHtml);
+        }
+        
+        // 测试登录
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showStatus('authStatus', '<div class="status error">❌ 请输入邮箱和密码</div>');
+                return;
+            }
+            
+            log(`尝试登录: ${email}`);
+            
+            try {
+                // 这里需要根据你的实际登录API调整
+                const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                log(`登录API响应: ${JSON.stringify(data, null, 2)}`);
+                
+                if (response.ok && data.access_token) {
+                    localStorage.setItem('access_token', data.access_token);
+                    showStatus('authStatus', '<div class="status success">✅ 登录成功！Token已保存</div>');
+                    log('登录成功，Token已保存到localStorage');
+                } else {
+                    showStatus('authStatus', `<div class="status error">❌ 登录失败: ${data.message || '未知错误'}</div>`);
+                    log(`登录失败: ${data.message || '未知错误'}`);
+                }
+            } catch (error) {
+                showStatus('authStatus', `<div class="status error">❌ 登录请求失败: ${error.message}</div>`);
+                log(`登录请求错误: ${error.message}`);
+            }
+        }
+        
+        // 测试发布功能
+        async function testPublish() {
+            const content = document.getElementById('testContent').value;
+            const token = localStorage.getItem('access_token');
+            
+            if (!content.trim()) {
+                showStatus('publishStatus', '<div class="status error">❌ 请输入测试内容</div>');
+                return;
+            }
+            
+            if (!token) {
+                showStatus('publishStatus', '<div class="status error">❌ 未找到认证Token，请先登录</div>');
+                return;
+            }
+            
+            log('开始测试发布功能...');
+            log(`发布内容: ${content}`);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v1/posts`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: content,
+                        location_data: {
+                            name: '测试地点',
+                            latitude: 31.2304,
+                            longitude: 121.4737
+                        },
+                        weather_data: {
+                            description: '晴天',
+                            temperature: 22
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                log(`发布API响应状态: ${response.status}`);
+                log(`发布API响应数据: ${JSON.stringify(data, null, 2)}`);
+                
+                if (response.ok && data.success) {
+                    showStatus('publishStatus', `
+                        <div class="status success">✅ 发布成功！</div>
+                        <div class="status info">📝 帖子ID: ${data.data?.id || '未知'}</div>
+                    `);
+                    log('发布成功！');
+                } else {
+                    showStatus('publishStatus', `
+                        <div class="status error">❌ 发布失败</div>
+                        <div class="status error">错误信息: ${data.message || data.error || response.statusText}</div>
+                        <div class="status info">响应状态: ${response.status}</div>
+                    `);
+                    log(`发布失败: ${data.message || data.error || response.statusText}`);
+                }
+            } catch (error) {
+                showStatus('publishStatus', `<div class="status error">❌ 发布请求失败: ${error.message}</div>`);
+                log(`发布请求错误: ${error.message}`);
+            }
+        }
+        
+        // 页面加载时自动检查系统状态
+        window.onload = function() {
+            log('调试工具已加载');
+            checkSystemStatus();
+        };
+    </script>
+</body>
+</html> 

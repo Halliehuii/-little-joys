@@ -139,3 +139,20 @@ https://yourapp.com/login
 2. 查看浏览器控制台错误信息
 3. 联系Supabase技术支持
 4. 在项目中创建issue报告问题 
+
+# 基础配置
+ENVIRONMENT=production
+HOST=0.0.0.0
+PORT=8000
+LOG_LEVEL=INFO
+
+# API密钥配置
+AMAP_API_KEY=de8a13d5b64cf6ef1ad84b12fd4cabd1
+OPENWEATHERMAP_API_KEY=你的新获取的OpenWeatherMap密钥
+
+# CORS配置
+CORS_ALLOWED_ORIGINS=https://littlejoys.xyz,https://www.littlejoys.xyz
+
+# Supabase配置（如果后端需要）
+SUPABASE_SERVICE_ROLE_KEY=你的Supabase服务密钥
+SUPABASE_JWT_SECRET=你的Supabase JWT密钥 
