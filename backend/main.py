@@ -141,12 +141,28 @@ else:
 
 @app.get("/health")
 async def health_check():
-    """健康检查端点"""
+    """健康检查API"""
     return {
         "status": "healthy",
-        "environment": ENVIRONMENT,
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0"
+        "service": "Little Joys API"
+    }
+
+@app.get("/api/v1/debug/config")
+async def debug_config():
+    """调试配置状态（仅显示配置是否存在，不显示实际值）"""
+    return {
+        "environment_variables": {
+            "AMAP_API_KEY": "✅ 已配置" if AMAP_API_KEY else "❌ 未配置",
+            "OPENWEATHERMAP_API_KEY": "✅ 已配置" if OPENWEATHERMAP_API_KEY else "❌ 未配置",
+            "SUPABASE_URL": "✅ 已配置" if SUPABASE_URL else "❌ 未配置",
+            "SUPABASE_KEY": "✅ 已配置" if SUPABASE_KEY else "❌ 未配置"
+        },
+        "api_keys_length": {
+            "AMAP_API_KEY": len(AMAP_API_KEY) if AMAP_API_KEY else 0,
+            "OPENWEATHERMAP_API_KEY": len(OPENWEATHERMAP_API_KEY) if OPENWEATHERMAP_API_KEY else 0
+        },
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.get("/")
@@ -308,6 +324,10 @@ async def reverse_geocode(latitude: float, longitude: float, lang: str = "zh-CN"
 async def get_current_weather(latitude: float, longitude: float, units: str = "metric", lang: str = "zh_cn"):
     """获取当前天气信息"""
     try:
+        # 检查API密钥是否配置
+        if not OPENWEATHERMAP_API_KEY:
+            raise HTTPException(status_code=500, detail="OpenWeatherMap API密钥未配置")
+        
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 "https://api.openweathermap.org/data/2.5/weather",
@@ -319,7 +339,35 @@ async def get_current_weather(latitude: float, longitude: float, units: str = "m
                     "lang": lang
                 }
             )
+            
+            # 检查HTTP响应状态
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=503, 
+                    detail=f"OpenWeatherMap API错误: HTTP {response.status_code} - {response.text}"
+                )
+            
             data = response.json()
+            
+            # 检查API错误响应
+            if "cod" in data and data["cod"] != 200:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"OpenWeatherMap API错误: {data.get('message', '未知错误')}"
+                )
+            
+            # 验证必需的数据字段
+            if "main" not in data:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"OpenWeatherMap API返回数据格式错误: 缺少main字段。响应: {data}"
+                )
+            
+            if "weather" not in data or len(data["weather"]) == 0:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"OpenWeatherMap API返回数据格式错误: 缺少weather字段。响应: {data}"
+                )
             
             return {
                 "data": {
@@ -351,6 +399,9 @@ async def get_current_weather(latitude: float, longitude: float, units: str = "m
                 },
                 "message": "当前天气数据获取成功"
             }
+    except HTTPException:
+        # 重新抛出HTTP异常
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取天气信息失败: {str(e)}")
 
