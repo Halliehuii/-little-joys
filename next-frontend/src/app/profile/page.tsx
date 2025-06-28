@@ -7,6 +7,7 @@ import Navbar from '@/components/Navbar';
 import PostCard from '@/components/PostCard';
 import { useAuthStore } from '@/lib/store/auth';
 import { signOut } from '@/lib/auth';
+import { getCurrentUserNickname, getUserProfile, getUserProfiles } from '@/lib/user';
 import toast from 'react-hot-toast';
 
 interface UserInfo {
@@ -70,6 +71,45 @@ export default function ProfilePage() {
   // 使用Zustand store获取认证状态
   const { user, isAuthenticated, isLoading: authLoading, clearUser } = useAuthStore();
 
+  // 获取用户真实信息的函数
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const userProfile = await getUserProfile(userId);
+      
+      const currentUserInfo: UserInfo = {
+        id: userProfile.id,
+        nickname: userProfile.nickname,
+        avatar_url: userProfile.avatar_url,
+        bio: userProfile.bio || '这个人很懒，什么都没留下',
+        location: user?.user_metadata?.location || '未设置',
+        created_at: userProfile.created_at,
+      };
+
+      setUserInfo(currentUserInfo);
+      setEditForm({
+        nickname: currentUserInfo.nickname,
+        bio: currentUserInfo.bio || '',
+        location: currentUserInfo.location || '',
+      });
+    } catch (error) {
+      console.error('获取用户配置文件失败:', error);
+      // 使用默认信息
+      const fallbackUserInfo: UserInfo = {
+        id: userId,
+        nickname: await getCurrentUserNickname(),
+        bio: '这个人很懒，什么都没留下',
+        location: '未设置',
+        created_at: user?.created_at || new Date().toISOString(),
+      };
+      setUserInfo(fallbackUserInfo);
+      setEditForm({
+        nickname: fallbackUserInfo.nickname,
+        bio: fallbackUserInfo.bio || '',
+        location: fallbackUserInfo.location || '',
+      });
+    }
+  };
+
   // 模拟用户发布的内容（作为后备）
   const mockUserPosts: Post[] = [
     {
@@ -81,8 +121,8 @@ export default function ProfilePage() {
       comments_count: 8,
       rewards_count: 5,
       user: {
-        nickname: user?.email?.split('@')[0] || '用户',
-        avatar_url: user?.user_metadata?.avatar_url,
+        nickname: userInfo?.nickname || '用户',
+        avatar_url: userInfo?.avatar_url,
       },
       weather_data: {
         description: '晴天',
@@ -97,8 +137,8 @@ export default function ProfilePage() {
       comments_count: 12,
       rewards_count: 8,
       user: {
-        nickname: user?.email?.split('@')[0] || '用户',
-        avatar_url: user?.user_metadata?.avatar_url,
+        nickname: userInfo?.nickname || '用户',
+        avatar_url: userInfo?.avatar_url,
       },
       location_data: {
         name: '温馨咖啡屋',
@@ -112,8 +152,8 @@ export default function ProfilePage() {
       comments_count: 15,
       rewards_count: 12,
       user: {
-        nickname: user?.email?.split('@')[0] || '用户',
-        avatar_url: user?.user_metadata?.avatar_url,
+        nickname: userInfo?.nickname || '用户',
+        avatar_url: userInfo?.avatar_url,
       },
     },
   ];
@@ -131,22 +171,9 @@ export default function ProfilePage() {
 
     // 初始化用户信息
     if (user) {
-      const currentUserInfo: UserInfo = {
-        id: user.id,
-        nickname: user.email?.split('@')[0] || '用户',
-        avatar_url: user.user_metadata?.avatar_url,
-        bio: user.user_metadata?.bio || '这个人很懒，什么都没留下',
-        location: user.user_metadata?.location || '未设置',
-        created_at: user.created_at,
-      };
-
-      setUserInfo(currentUserInfo);
-      setEditForm({
-        nickname: currentUserInfo.nickname,
-        bio: currentUserInfo.bio || '',
-        location: currentUserInfo.location || '',
-      });
-
+      // 获取用户真实配置文件信息
+      fetchUserProfile(user.id);
+      
       // 获取真实的用户统计数据
       fetchUserStats();
     }
@@ -214,25 +241,37 @@ export default function ProfilePage() {
       console.log('posts', result)
       // 修复数据格式处理 - 直接使用后端返回的格式
       if (result.data && Array.isArray(result.data.posts)) {
-        // 转换数据格式
-        const transformedPosts = result.data.posts.map((post: any) => ({
-          id: post.id,
-          content: post.content,
-          image_url: post.image_url,
-          created_at: post.created_at,
-          likes_count: post.likes_count || 0,
-          comments_count: post.comments_count || 0,
-          rewards_count: post.rewards_count || 0,
-          user: {
-            nickname: post.username || '用户',
-            avatar_url: undefined
-          },
-          location_data: post.location ? { name: `位置 (${post.location.latitude}, ${post.location.longitude})` } : undefined,
-          weather_data: post.weather ? { 
-            description: post.weather.weather || post.weather.description || '未知天气', 
-            temperature: post.weather.temperature || 0 
-          } : undefined
-        }));
+        // 提取所有用户ID
+        const userIds = result.data.posts
+          .map((post: any) => post.user_id)
+          .filter((id: string) => id)
+        
+        // 批量获取用户信息
+        const userProfiles = await getUserProfiles(userIds)
+        
+        // 转换数据格式，使用真实的用户昵称
+        const transformedPosts = result.data.posts.map((post: any) => {
+          const userProfile = userProfiles.get(post.user_id)
+          
+          return {
+            id: post.id,
+            content: post.content,
+            image_url: post.image_url,
+            created_at: post.created_at,
+            likes_count: post.likes_count || 0,
+            comments_count: post.comments_count || 0,
+            rewards_count: post.rewards_count || 0,
+            user: {
+              nickname: userProfile?.nickname || post.username || '用户',
+              avatar_url: userProfile?.avatar_url
+            },
+            location_data: post.location ? { name: `位置 (${post.location.latitude}, ${post.location.longitude})` } : undefined,
+            weather_data: post.weather ? { 
+              description: post.weather.weather || post.weather.description || '未知天气', 
+              temperature: post.weather.temperature || 0 
+            } : undefined
+          }
+        });
 
         // 过滤当前用户的帖子 - 匹配用户ID
         const userFilteredPosts = transformedPosts.filter((post: any) => {

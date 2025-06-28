@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import PostCard from '@/components/PostCard'
 import CreatePost from '@/components/CreatePost'
+import { getUserProfiles } from '@/lib/user'
 
 interface Post {
   id: string
@@ -52,25 +53,38 @@ export default function HomePage() {
       // 检查数据格式
       if (result.data && Array.isArray(result.data.posts)) {
         console.log('✅ 数据格式正确，开始转换...')
-        // 简化数据转换
-        const transformedPosts = result.data.posts.map((post: any) => ({
-          id: post.id,
-          content: post.content,
-          image_url: post.image_url,
-          created_at: post.created_at,
-          likes_count: post.likes_count || 0,
-          comments_count: post.comments_count || 0,
-          rewards_count: post.rewards_count || 0,
-          user: {
-            nickname: post.username || '匿名用户',
-            avatar_url: undefined
-          },
-          location_data: post.location?.address ? { name: post.location.address } : undefined,
-          weather_data: post.weather?.description ? { 
-            description: post.weather.description, 
-            temperature: post.weather.temperature || 0 
-          } : undefined
-        }))
+        
+        // 提取所有用户ID
+        const userIds = result.data.posts
+          .map((post: any) => post.user_id)
+          .filter((id: string) => id) // 过滤掉空值
+        
+        // 批量获取用户信息
+        const userProfiles = await getUserProfiles(userIds)
+        
+        // 简化数据转换，使用真实的用户昵称
+        const transformedPosts = result.data.posts.map((post: any) => {
+          const userProfile = userProfiles.get(post.user_id)
+          
+          return {
+            id: post.id,
+            content: post.content,
+            image_url: post.image_url,
+            created_at: post.created_at,
+            likes_count: post.likes_count || 0,
+            comments_count: post.comments_count || 0,
+            rewards_count: post.rewards_count || 0,
+            user: {
+              nickname: userProfile?.nickname || post.username || '用户',
+              avatar_url: userProfile?.avatar_url
+            },
+            location_data: post.location?.address ? { name: post.location.address } : undefined,
+            weather_data: post.weather?.description ? { 
+              description: post.weather.description, 
+              temperature: post.weather.temperature || 0 
+            } : undefined
+          }
+        })
         
         console.log('🎯 转换后的帖子数据:', transformedPosts)
         setPosts(transformedPosts)
@@ -187,10 +201,10 @@ export default function HomePage() {
         {/* 欢迎标语 */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Find Your Happy in the Little Things
+            记录生活中的小幸福
           </h1>
           <p className="text-gray-600">
-            Joy Lives in the Details
+            幸福就在细节里
           </p>
         </div>
 

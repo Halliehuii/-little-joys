@@ -369,15 +369,14 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
                   type="button"
                   onClick={handleGetLocation}
                   disabled={locationLoading}
-                  className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-20 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {locationLoading ? (
                     <>
-                      <span className="animate-spin mr-1">⏳</span>
-                      获取中...
+                      <span className="animate-spin">⏳</span>
                     </>
                   ) : (
-                    <>📍 自动获取位置</>
+                    <>📍 获取</>
                   )}
                 </button>
               </div>
@@ -404,15 +403,14 @@ const CreatePost = ({ onSubmit, onCancel, isVisible }: CreatePostProps) => {
                   type="button"
                   onClick={handleGetWeather}
                   disabled={weatherLoading}
-                  className="px-4 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-20 py-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {weatherLoading ? (
                     <>
-                      <span className="animate-spin mr-1">⏳</span>
-                      获取中...
+                      <span className="animate-spin">⏳</span>
                     </>
                   ) : (
-                    <>🌤️ 自动获取天气</>
+                    <>🌤️ 获取</>
                   )}
                 </button>
               </div>

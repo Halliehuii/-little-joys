@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth';
 import { signOut } from '@/lib/auth';
+import { getCurrentUserNickname } from '@/lib/user';
 import toast from 'react-hot-toast';
 
 const Navbar = () => {
@@ -14,6 +15,27 @@ const Navbar = () => {
   
   // 使用Zustand store获取认证状态
   const { user, isAuthenticated, clearUser } = useAuthStore();
+  const [userNickname, setUserNickname] = useState<string>('用户');
+
+  // 获取用户昵称
+  useEffect(() => {
+    const fetchUserNickname = async () => {
+      if (isAuthenticated && user) {
+        try {
+          const nickname = await getCurrentUserNickname();
+          setUserNickname(nickname);
+        } catch (error) {
+          console.error('获取用户昵称失败:', error);
+          // 使用邮箱前缀作为后备
+          setUserNickname(user.email?.split('@')[0] || '用户');
+        }
+      } else {
+        setUserNickname('用户');
+      }
+    };
+
+    fetchUserNickname();
+  }, [isAuthenticated, user]);
 
   const handleLogout = async () => {
     try {
@@ -42,9 +64,8 @@ const Navbar = () => {
             <span className="text-2xl">📮</span>
             <div className="flex flex-col">
               <span className="text-lg font-bold text-gray-800 group-hover:text-yellow-600 transition-colors">
-                Little 幸福小事
+                幸福小事日记
               </span>
-              <span className="text-xs text-gray-600 -mt-1">Joys Journal</span>
             </div>
           </Link>
 
@@ -97,9 +118,9 @@ const Navbar = () => {
                     👤 我的
                   </Link>
                   
-                  {/* 用户邮箱显示 */}
+                  {/* 用户昵称显示 */}
                   <span className="px-3 py-2 text-sm text-gray-600">
-                    📧 {user?.email || '用户'}
+                    📧 {userNickname}
                   </span>
                   
                   <button
@@ -200,9 +221,9 @@ const Navbar = () => {
                   👤 我的
                 </Link>
                 
-                {/* 移动端用户信息显示 */}
+                {/* 移动端用户昵称显示 */}
                 <div className="px-3 py-2 text-sm text-gray-600">
-                  📧 {user?.email || '用户'}
+                  📧 {userNickname}
                 </div>
                 
                 <button
